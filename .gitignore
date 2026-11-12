@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+/data/
+/vault/
+/config/
+/redis-data/
+/ollama/
+*.log
+tests/.run/
+demo/out/
+demo/run/
+demo/pages/
+demo/shots/
+demo/ui-run/
+*.tsbuildinfo
+.DS_Store

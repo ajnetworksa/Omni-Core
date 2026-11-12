@@ -1,0 +1,11 @@
+node_modules
+**/dist
+vault
+data
+redis-data
+ollama
+config
+.env
+**/*.tsbuildinfo
+tests/.run
+.git

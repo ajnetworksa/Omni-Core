@@ -1,0 +1,26 @@
+// Visual pass over several screens: node demo/peek-many.mjs
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+const require = createRequire("/opt/npm-tools/node_modules/");
+const { chromium } = require("playwright");
+const { base, token } = JSON.parse(readFileSync(new URL("./ui-run/ready", import.meta.url)));
+const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+const ctx = await b.newContext({ viewport: { width: 1360, height: 860 }, deviceScaleFactor: 1.25 });
+const p = await ctx.newPage();
+const errors = [];
+p.on("pageerror", (e) => errors.push(e.message));
+p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+await p.request.post(base + "/api/session", { data: { token } });
+const shot = async (name) => { await p.waitForTimeout(900); await p.screenshot({ path: `/tmp/p-${name}.png` }); };
+await p.goto(base + "/"); await p.waitForTimeout(800);
+await p.getByRole("button", { name: /^Replace core switch/ }).first().click(); await shot("drawer");
+await p.keyboard.press("Escape");
+await p.goto(base + "/board"); await shot("board");
+const notes = await (await p.request.get(base + "/api/notes")).json();
+await p.goto(base + `/notes/${notes.find((n) => n.path === "projects/homelab.md").id}`); await shot("notes");
+await p.goto(base + "/graph"); await shot("graph");
+await p.goto(base + "/upcoming"); await shot("upcoming");
+await p.goto(base + "/"); await p.keyboard.press("Control+k"); await p.keyboard.type("vlan"); await shot("palette");
+await ctx.clearCookies(); await p.goto(base + "/"); await shot("login");
+console.log("errors:", errors.length ? errors : "none");
+await b.close();

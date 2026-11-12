@@ -1,0 +1,93 @@
+# OmniCore Workspace
+#
+#   cp .env.example .env      # fill in what you want; everything left empty stays off
+#   docker compose up -d      # first start builds the app (a few minutes)
+#
+# Extras switch on from .env with COMPOSE_PROFILES (comma-separated):
+#   ai           local Ollama — the models named in .env download on first start
+#   tunnel       Cloudflare Tunnel on your own domain — needs CLOUDFLARE_TUNNEL_TOKEN
+#   quicktunnel  instant https://….trycloudflare.com address, no account or domain (the bot sends you the link)
+#   redis        Redis + BullMQ scheduler instead of the built-in timers (optional)
+#
+# Update:  scripts/update.sh   (or simply: git pull && docker compose up -d --build)
+
+services:
+  omnicore-app:
+    image: ${OMNICORE_IMAGE:-omnicore-workspace:local}
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILT_AT: ${BUILT_AT:-}
+    container_name: omnicore_app
+    restart: unless-stopped
+    ports:
+      - "${LISTEN:-127.0.0.1}:${PORT:-3000}:3000"   # LISTEN=0.0.0.0 in .env opens it to your local network
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /data/app.db
+      VAULT_PATH: /vault
+      HOST: 0.0.0.0
+      PORT: "3000"
+      TRUST_PROXY: "true"   # requests arrive via cloudflared; the port is only published on 127.0.0.1
+      OMNICORE_PROFILES: ${COMPOSE_PROFILES:-}   # lets the app find the bundled Ollama / Redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Ollama on the host instead: OLLAMA_BASE_URL=http://host.docker.internal:11434
+    volumes:
+      - ./data:/data
+      - ./vault:/vault
+      - ./config:/config
+    depends_on:
+      omnicore-ollama: { condition: service_started, required: false }
+      omnicore-redis: { condition: service_started, required: false }
+
+  omnicore-ollama:
+    image: ollama/ollama:latest
+    container_name: omnicore_ollama
+    restart: unless-stopped
+    profiles: ["ai"]
+    volumes:
+      - ./ollama:/root/.ollama
+    # NVIDIA GPU: uncomment
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # In the Cloudflare Zero Trust dashboard, point the tunnel's public hostname at http://omnicore-app:3000
+  omnicore-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: omnicore_tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - omnicore-app
+
+  # Quick tunnel: a temporary public https address without a Cloudflare account. The app reads
+  # the address from the metrics port and sets the Telegram Mini App button to it.
+  omnicore-quicktunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: omnicore_quicktunnel
+    restart: unless-stopped
+    profiles: ["quicktunnel"]
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://omnicore-app:3000
+    depends_on:
+      - omnicore-app
+
+  omnicore-redis:
+    image: redis:7-alpine
+    container_name: omnicore_redis
+    restart: unless-stopped
+    profiles: ["redis"]
+    command: redis-server --appendonly yes
+    volumes:
+      - ./redis-data:/data

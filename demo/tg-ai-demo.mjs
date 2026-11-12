@@ -1,0 +1,32 @@
+// A short Telegram session with the AI features, for screenshots: node demo/tg-ai-demo.mjs
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { client, freshDir, ROOT, sleep, startServer } from "../tests/lib/harness.mjs";
+import { callbackUpdate, mediaUpdate, startMockTelegram, textUpdate } from "../tests/lib/mock-telegram.mjs";
+import { startMockAi } from "../tests/lib/mock-ai.mjs";
+import { seedVault } from "../tests/lib/seed.mjs";
+
+const TZ = "Asia/Riyadh", ME = 111, TOKEN = "4242:AIDEMO", API_TOKEN = "ai-demo-token-0123456789";
+const RUN = freshDir(join(ROOT, "demo/out/ai-chat"));
+const VAULT = join(RUN, "vault");
+seedVault(VAULT, TZ);
+writeFileSync(join(VAULT, "projects/Core switch decision.md"), "# Core switch decision\n\n## Why\nWe decided to replace the core switch with a Cisco SG350 because the old one drops VLAN config after firmware updates.\n");
+const ai = await startMockAi({ port: 3982, demo: true });
+const tg = await startMockTelegram({ port: 3981, token: TOKEN });
+tg.addFile("v1", "voice/file_1.oga", Buffer.from("OggS…TRANSCRIPT:Remember to order a spare PSU tomorrow, it's urgent. I also need to call the ISP about the outage."));
+tg.addFile("p1", "photos/file_2.jpg");
+const user = [];
+const send = (u, rec) => { user.push({ at: Date.now(), ...rec }); tg.inject(u); };
+const srv = await startServer({ port: 3980, env: { VAULT_PATH: VAULT, DATABASE_PATH: join(RUN, "app.db"), TIMEZONE: TZ, API_TOKEN, TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_ALLOWED_USER_IDS: String(ME), TELEGRAM_API_ROOT: tg.url, NAG_ENABLED: "false", DIGEST_TIME: "", RETRO_TIME: "", REINDEX_INTERVAL_MINUTES: "0", OLLAMA_BASE_URL: ai.url, STT_BASE_URL: `${ai.url}/v1`, AI_VISION_MODEL: "llama3.2-vision" } });
+await client(srv.base, API_TOKEN).post("/api/ai/reindex");
+const reply = (since, re) => tg.waitFor("sendMessage", (x) => re.test(x.payload.text), 10000, since);
+let m = tg.mark(); send(textUpdate(tg, ME, "/ask why did we decide to replace the core switch?"), { text: "/ask why did we decide to replace the core switch?" }); await reply(m, /Sources/);
+m = tg.mark(); send(mediaUpdate(tg, ME, "voice", "v1"), { voice: true }); const v = await reply(m, /I heard/);
+await sleep(400);
+m = tg.mark(); send(callbackUpdate(tg, ME, v.payload.reply_markup.inline_keyboard[0][0].callback_data, { message_id: v.result.message_id, text: v.payload.text }), { tap: "add" }); await tg.waitFor("editMessageText", () => true, 8000, m);
+m = tg.mark(); send(mediaUpdate(tg, ME, "photo", "p1", "rear of the new switch"), { photo: true, caption: "rear of the new switch" }); await reply(m, /Switch rear label/);
+m = tg.mark(); send(textUpdate(tg, ME, "/standup"), { text: "/standup" }); await reply(m, /Standup/);
+await srv.stop();
+writeFileSync(join(RUN, "telegram.json"), JSON.stringify({ user, bot: tg.calls.filter((x) => ["sendMessage", "editMessageText"].includes(x.method)) }));
+await tg.close(); await ai.close();
+console.log("ok");

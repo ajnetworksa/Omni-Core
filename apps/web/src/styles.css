@@ -1,0 +1,96 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/manrope";
+
+/* Midnight (web) tokens. The Mini App overrides --tg-* from Telegram's theme at runtime. */
+@theme {
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-display: "Manrope Variable", "Inter Variable", sans-serif;
+
+  --color-ink: #0b0d12;
+  --color-panel: #0e1117;
+  --color-card: #12151d;
+  --color-raised: #161a23;
+  --color-line: #1e2330;
+  --color-line-strong: #2a3040;
+  --color-fg: #e6e8ee;
+  --color-fg-2: #b5bac6;
+  --color-muted: #9097a6;
+  --color-faint: #8a91a0;
+  --color-accent: #8b7cf6;
+  --color-accent-soft: #b4a9ff;
+  --color-warn: #fbbf24;
+  --color-warn-line: #2b2416;
+  --color-danger: #f87171;
+  --color-ok: #34d399;
+}
+
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--color-ink); color: var(--color-fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 6px; }
+::selection { background: color-mix(in oklab, var(--color-accent) 40%, transparent); }
+* { scrollbar-width: thin; scrollbar-color: #2a3040 transparent; }
+
+/* Mini App — Paper (mockup B): its own palette, not Telegram's theme colours. Light by default;
+   a matching "Paper night" variant when the user picks dark (or "auto" and Telegram is dark). */
+.tg {
+  --tg-bg: #f7f7f5;
+  --tg-fg: #1c1d21;
+  --tg-fg-2: #3a3d46;
+  --tg-hint: #5e6270;
+  --tg-section: #ffffff;
+  --tg-secondary: #efefec;
+  --tg-chip: #eaeae6;
+  --tg-check: #c9c9c3;
+  --tg-accent: #2f6feb;
+  --tg-accent-fg: #ffffff;
+  --tg-accent-soft: #e8f0fe;
+  --tg-link: #1f5fd6;
+  --tg-danger: #b91c1c;
+  --tg-warn: #c2410c;
+  --tg-warn-dot: #ea580c;
+  --tg-sep: #f0f0ec;
+  --tg-ring: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 0 1px #e7e7e3;
+  --tg-note-bg: #fff7ed;
+  --tg-note-line: #fed7aa;
+  --tg-note-fg: #9a3412;
+  --tg-block-bg: #fef2f2;
+  --tg-block-line: #fca5a5;
+  background: var(--tg-bg);
+  color: var(--tg-fg);
+  min-height: var(--tg-viewport-stable-height, 100vh);
+  padding-top: var(--tg-content-safe-area-inset-top, 0px);
+  padding-bottom: var(--tg-safe-area-inset-bottom, 0px);
+}
+.tg.tg-dark {
+  --tg-bg: #16171a;
+  --tg-fg: #ececea;
+  --tg-fg-2: #c9cad0;
+  --tg-hint: #9b9ea8;
+  --tg-section: #212227;
+  --tg-secondary: #2a2b31;
+  --tg-chip: #303139;
+  --tg-check: #5a5c65;
+  --tg-accent: #5b8def;
+  --tg-accent-soft: #233150;
+  --tg-link: #8ab0f5;
+  --tg-danger: #f87171;
+  --tg-warn: #fdba74;
+  --tg-warn-dot: #fb923c;
+  --tg-sep: #2c2d33;
+  --tg-ring: 0 0 0 1px #2c2d33;
+  --tg-note-bg: #2a1f15;
+  --tg-note-line: #5a3a1e;
+  --tg-note-fg: #fdba74;
+  --tg-block-bg: #3a1d1d;
+  --tg-block-line: #7f2d2d;
+}
+.tg textarea::placeholder, .tg input::placeholder { color: var(--tg-hint); opacity: 0.8; }
+.tg .no-scrollbar { scrollbar-width: none; }
+.tg .no-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes in-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.anim-in { animation: in-up .18s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .anim-in { animation: none; } }

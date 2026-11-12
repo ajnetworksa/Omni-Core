@@ -1,0 +1,24 @@
+// Mini App "Break it into steps" screenshot: node demo/peek-tg-ai.mjs [outDir]
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { signInitData } from "../apps/server/dist/auth.js";
+import { telegramStub } from "./tg-stub.mjs";
+const require = createRequire("/opt/npm-tools/node_modules/");
+const { chromium } = require("playwright");
+const { base, bot } = JSON.parse(readFileSync(new URL("./ui-run/ready", import.meta.url)));
+const out = process.argv[2] ?? "/tmp";
+const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+const errors = [];
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await ctx.addInitScript(telegramStub({ initData: signInitData(bot, { id: 111, first_name: "Sabbir" }), dark: false }));
+const p = await ctx.newPage();
+p.on("pageerror", (e) => errors.push(e.message));
+p.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+await p.goto(base + "/tg"); await p.waitForTimeout(1500);
+await p.getByText("Replace core switch").first().click(); await p.waitForTimeout(1000);
+await p.getByRole("button", { name: /Break it into steps|Suggest more steps/ }).click();
+await p.getByText("Suggested steps").waitFor({ timeout: 8000 });
+await p.waitForTimeout(500);
+await p.screenshot({ path: `${out}/ai-tg-breakdown.png` });
+console.log("errors:", errors.length ? errors : "none");
+await b.close();

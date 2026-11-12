@@ -1,0 +1,31 @@
+{
+  "name": "omnicore-workspace",
+  "private": true,
+  "version": "0.5.3",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @omnicore/server",
+    "build": "tsc -b && npm run build -w @omnicore/web",
+    "start": "npm run start -w @omnicore/server",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "tsc -b",
+    "test:e2e": "npm run build && node --disable-warning=ExperimentalWarning tests/e2e.mjs",
+    "test:security": "npm run build && node --disable-warning=ExperimentalWarning tests/security.mjs",
+    "dev:web": "npm run dev -w @omnicore/web",
+    "test:ai": "npm run build && node --disable-warning=ExperimentalWarning tests/ai-e2e.mjs",
+    "backup": "node apps/server/dist/backup.js",
+    "update": "bash scripts/update.sh",
+    "test:all": "npm run build && npm test && node --disable-warning=ExperimentalWarning tests/e2e.mjs && node --disable-warning=ExperimentalWarning tests/security.mjs && node --disable-warning=ExperimentalWarning tests/ai-e2e.mjs"
+  },
+  "engines": {
+    "node": ">=22.16"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

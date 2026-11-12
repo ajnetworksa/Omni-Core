@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build (types + web)
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+      # The end-to-end suites start the real server against mock Telegram / mock AI servers.
+      - name: End-to-end features
+        run: node --disable-warning=ExperimentalWarning tests/e2e.mjs
+      - name: Security
+        run: node --disable-warning=ExperimentalWarning tests/security.mjs
+      - name: AI end-to-end
+        run: node --disable-warning=ExperimentalWarning tests/ai-e2e.mjs
+      - name: Update script lint
+        run: shellcheck -S warning scripts/*.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-run-logs
+          path: tests/.run/**/*.log
+          retention-days: 7
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build --build-arg GIT_SHA=${{ github.sha }} -t omnicore-workspace:ci .
+      - name: Smoke-test the image
+        run: |
+          mkdir -p data vault && sudo chown -R 1000:1000 data vault
+          docker run -d --name oc -p 3000:3000 -e API_TOKEN=ci-token-0123456789abcdef -e AI_PROVIDER=none \
+            -e DATABASE_PATH=/data/app.db -e VAULT_PATH=/vault -v "$PWD/data:/data" -v "$PWD/vault:/vault" omnicore-workspace:ci
+          for _ in $(seq 30); do curl -fsS localhost:3000/health && break; sleep 2; done
+          curl -fsS localhost:3000/health | grep -q '"sha":"${{ github.sha }}' || (docker logs oc; exit 1)
+          curl -fsS localhost:3000/ | grep -q '<div id="root">' || (docker logs oc; exit 1)
+          docker exec oc node apps/server/dist/backup.js | tail -1
