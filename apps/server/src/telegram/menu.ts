@@ -50,7 +50,8 @@ type Waiting =
   | { kind: "task"; projectId?: string }
   | { kind: "project"; draftId?: string }
   | { kind: "search" }
-  | { kind: "ask" };
+  | { kind: "ask" }
+  | { kind: "remark"; taskId: string };
 
 const WAIT_MS = 15 * 60_000;
 const DRAFT_TTL_MS = 2 * 86_400_000;
@@ -411,6 +412,11 @@ export function installMenus(bot: Bot, app: AppContext, deps: MenuDeps) {
         case "ask":
           await deps.ask(ctx, text);
           return true;
+        case "remark": {
+          const t = app.tasks.addRemark(w.taskId, text, "telegram");
+          await ctx.reply(`💬 Update saved on <b>${esc(t.title)}</b>.\nI'll check back on it later instead of the usual reminders.`, { parse_mode: "HTML", reply_markup: reminderKeyboard(t.id) });
+          return true;
+        }
       }
     }
     const tag = text.match(/^#project\/([a-z0-9][a-z0-9-]*)$/i);
@@ -428,6 +434,9 @@ export function installMenus(bot: Bot, app: AppContext, deps: MenuDeps) {
   };
 
   return {
+    /** "💬 Update": the next message (reply or not) is saved on the task. */
+    askRemark: (ctx: Context, taskId: string, title: string) =>
+      prompt(ctx, { kind: "remark", taskId }, `💬 <b>What's the update on “${esc(title)}”?</b>\n<i>e.g. waiting for parts, half done, blocked by …</i>\nJust type it; your next message is saved on the task.`, "e.g. Waiting for parts delivery"),
     openProject,
     sendStart,
     sendMenu,

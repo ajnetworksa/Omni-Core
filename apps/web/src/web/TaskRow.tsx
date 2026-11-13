@@ -1,17 +1,14 @@
 import { MessageSquare } from "lucide-react";
-import { useSearchParams } from "react-router";
+import { useAppNavigate } from "../app/platform";
 import { api, refreshAll } from "../lib/api";
 import { nagLine, progressOf } from "../lib/nag";
 import type { TaskCard } from "../lib/types";
 import { Chip, PriorityChip, ProgressBar, RepeatIcon, TaskCheck } from "./ui";
 
+/** Open a task's page (the same task screen on web and in Telegram). */
 export function useOpenTask() {
-  const [params, setParams] = useSearchParams();
-  return {
-    openId: params.get("task"),
-    open: (id: string) => setParams((p) => (p.set("task", id), p)),
-    close: () => setParams((p) => (p.delete("task"), p)),
-  };
+  const navigate = useAppNavigate();
+  return { open: (id: string) => navigate(`/task/${id}`) };
 }
 
 export async function toggleDone(t: TaskCard) {
@@ -28,14 +25,14 @@ export function TaskRow({ t, variant = "row", showProject = true }: { t: TaskCar
   const card = variant === "card";
   return (
     <div
-      className={`group flex items-center gap-3 ${card ? "rounded-[10px] border border-warn-line bg-card px-3.5 py-3" : "rounded-lg px-3.5 py-2.5 hover:bg-white/[.03]"}`}
+      className={`group flex items-center gap-3 ${card ? "rounded-[10px] border border-warn-line bg-card px-3.5 py-3" : "rounded-lg px-3.5 py-2.5 hover:bg-[var(--tg-chip)]"}`}
     >
       <TaskCheck t={t} onToggle={() => void toggleDone(t)} />
       <button type="button" onClick={() => open(t.id)} className="flex min-w-0 flex-1 flex-col gap-1 text-left">
         <span className="flex flex-wrap items-center gap-2">
           <span className={`font-medium ${done ? "text-faint line-through" : ""}`}>{t.title}</span>
           <PriorityChip p={t.priority} />
-          {t.status === "blocked" && <Chip tone="danger">Blocked</Chip>}
+          {t.status === "blocked" && <Chip tone="danger">Waiting</Chip>}
           {t.rolloverCount > 0 && !done && <Chip tone="warn">{`↻ ${t.rolloverCount}`}</Chip>}
           {t.recurrence && <RepeatIcon />}
         </span>
@@ -60,7 +57,7 @@ export function TaskRow({ t, variant = "row", showProject = true }: { t: TaskCar
         )}
       </button>
       {!card && showProject && t.projectTitle && <span className="hidden w-32 truncate text-xs text-muted sm:block">{t.projectTitle}</span>}
-      <span className={`w-12 text-right font-mono text-xs ${card ? (t.priority === 1 ? "text-danger" : "text-[#fb923c]") : "text-fg-2"}`}>
+      <span className={`w-12 text-right font-mono text-xs ${card ? (t.priority === 1 ? "text-danger" : "text-warn") : "text-fg-2"}`}>
         {done && t.completedAt ? new Date(t.completedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : (t.dueTime ?? "")}
       </span>
     </div>

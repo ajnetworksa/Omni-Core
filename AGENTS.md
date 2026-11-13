@@ -39,7 +39,12 @@ apps/server/            Fastify API + Telegram bot (grammY) + scheduler; serves 
   src/telegram/         bot.ts (commands, buttons, media), format.ts (HTML), notifier.ts (reminders)
   src/ai.ts             embedding sync with backoff, reachability probe, standup/retro
   src/backup.ts         DB backup/restore CLI;  src/version.ts  version + GitHub update check
-apps/web/               React 19 + Vite + Tailwind 4: web app at /, Telegram Mini App at /tg
+apps/web/               React 19 + Vite + Tailwind 4: ONE app, served at / (web) and /tg (Telegram Mini App)
+  src/app/              the shared screens (Today, Upcoming, Projects, Task, Settings, Help…), frame, platform
+                        (usePrimary/useBack = Telegram's buttons or in-page ones), ui.tsx, words.ts (plain words)
+  src/web/              web-born screens reused by both (Notes, Board, Graph, search palette, daily note)
+  src/tg/               Telegram glue only (SDK, MiniApp entry, quick-add suggestions)
+  src/settings.ts (server) settings registry: labels/help shown in the UI; stored in the `settings` table
 tests/                  end-to-end suites (real server + mock Telegram/AI); lib/ has the mocks
 scripts/                update.sh, install.sh (optional first-start shortcut), config-docs.mjs
 demo/                   screenshot/demo scripts (Playwright); not part of the product
@@ -102,3 +107,9 @@ editing core before `npm test -w @omnicore/server`.
 - The tests never need real Telegram or Ollama: `tests/lib/mock-telegram.mjs` and `tests/lib/mock-ai.mjs` stand in (set `TELEGRAM_API_ROOT` / `OLLAMA_BASE_URL`).
 - The BullMQ/Redis scheduler path (`REDIS_URL`) is **not** covered by the suites. The built-in timers are the default and the tested path.
 - Windows hosts with Docker bind mounts need `VAULT_POLLING=true`.
+
+## UI rules (since 0.6)
+- One app for web and Telegram. Never add a screen to only one of them; put it in `src/app/` and use `usePrimary` / `useBack` instead of touching `tg.MainButton` directly.
+- Words: use `app/words.ts` (Someday / To do / Doing / Waiting / Done, "Update" not "remark"). Explain anything non-obvious with `<Explain>`.
+- Colours: only the Paper tokens (`var(--tg-…)` or the Tailwind names that map to them). No hex values in components.
+- Anything destructive: `<Confirm>` first, then a toast with Undo where the server supports it.

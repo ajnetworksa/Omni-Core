@@ -116,6 +116,14 @@ describe("telegram bot", () => {
     const promptMessageId = prompt.result.message_id;
     await h.send("Awaiting parts delivery", { reply_to_message: { message_id: promptMessageId, date: 0, chat: { id: ME, type: "private" } } });
     expect(h.ctx.tasks.get(t.id).remarks.map((r) => r.text)).toEqual(["Awaiting parts delivery"]);
+    // Typing without Telegram's "reply" works too (that's what most people do).
+    await h.tap(`t:rem:${t.id}`);
+    await h.send("Supplier called, Monday");
+    expect(h.ctx.tasks.get(t.id).remarks.map((r) => r.text)).toEqual(["Awaiting parts delivery", "Supplier called, Monday"]);
+    expect(h.last("sendMessage").payload.text).toContain("Update saved");
+    // …and only the next message: the one after is a normal log line again.
+    await h.send("just a log line");
+    expect(h.ctx.tasks.get(t.id).remarks).toHaveLength(2);
 
     await h.tap(`t:done:${t.id}`);
     expect(file()).toMatch(/- \[x\] Order SFPs .*✅ \d{4}-\d{2}-\d{2} \^oc-/);
@@ -162,7 +170,7 @@ describe("telegram bot", () => {
     expect(r.sent).toBe(1);
     const msg = h.last("sendMessage").payload;
     expect(msg.text).toContain("⏰ <b>Overdue</b> by 1h");
-    expect(msg.reply_markup.inline_keyboard[1].map((b: any) => b.text)).toEqual(["⏱ +1h", "🌅 Tomorrow", "🔕 Today"]);
+    expect(msg.reply_markup.inline_keyboard[1].map((b: any) => b.text)).toEqual(["⏱ In 1 hour", "🌅 Tomorrow", "🔕 Quiet today"]);
     expect((await runNagTick(h.ctx.db, notifier, h.ctx.nag, new Date(at.getTime() + 60_000))).sent).toBe(0);
   });
 });
@@ -259,5 +267,21 @@ describe("telegram buttons", () => {
     expect(h.last("sendMessage").payload.text).toContain("Router Ideas");
     await h.send("just a log line");
     expect(h.ctx.db.select().from(tasks).all()).toHaveLength(0);
+  });
+
+  it("🗑 delete asks first, then Undo puts it back", async () => {
+    await h.send("+ Throwaway task @today");
+    const t = h.ctx.db.select().from(tasks).get()!;
+    await h.tap(`t:menu:${t.id}`);
+    expect(buttons(h.last("editMessageReplyMarkup")).map((b) => b.text)).toContain("🗑 Delete task");
+    await h.tap(`t:del:${t.id}`);
+    expect(h.ctx.db.select().from(tasks).all()).toHaveLength(1); // nothing deleted yet
+    await h.tap(`t:delok:${t.id}`);
+    expect(h.ctx.db.select().from(tasks).all()).toHaveLength(0);
+    const undo = data(h.last("editMessageText"), "Undo");
+    await h.tap(undo);
+    expect(h.ctx.tasks.get(t.id).title).toBe("Throwaway task");
+    await h.tap(undo);
+    expect(h.last("answerCallbackQuery").payload.text).toMatch(/Nothing to undo/);
   });
 });

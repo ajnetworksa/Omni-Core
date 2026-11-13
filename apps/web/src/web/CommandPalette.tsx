@@ -1,13 +1,13 @@
+import { useAppNavigate as useNavigate } from "../app/platform";
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
 import { CheckSquare, FileText, Search, Sparkles } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 import { aiErrorText, api } from "../lib/api";
 import type { AskResult, AskSource } from "../lib/types";
 import { useOpenTask } from "./TaskRow";
 
 const PAGES = [
-  ["Today", "/"], ["Upcoming", "/upcoming"], ["Inbox", "/inbox"], ["Board", "/board"], ["Notes", "/notes"], ["Graph", "/graph"],
+  ["Today", "/"], ["Upcoming", "/upcoming"], ["Projects", "/projects"], ["Notes", "/notes"], ["Board", "/board"], ["Map", "/map"], ["Settings", "/settings"], ["Help", "/help"],
 ] as const;
 
 type Item = { key: string; label: string; sub: string; run: () => void; icon: "task" | "note" | "page"; group?: string };
@@ -21,7 +21,7 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
-export function CommandPalette({ open, onClose, initialMode = "search" }: { open: boolean; onClose: () => void; initialMode?: "search" | "ask" }) {
+export function CommandPalette({ open, onClose, initialMode = "search", inline = false }: { open: boolean; onClose: () => void; initialMode?: "search" | "ask"; inline?: boolean }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const [mode, setMode] = useState<"search" | "ask">(initialMode);
@@ -98,8 +98,8 @@ export function CommandPalette({ open, onClose, initialMode = "search" }: { open
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 px-4 pt-[12vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Search and ask" className="anim-in w-full max-w-xl overflow-hidden rounded-xl border border-line-strong bg-panel shadow-2xl">
+    <div className={inline ? "px-4 pt-4" : "fixed inset-0 z-50 flex items-start justify-center bg-[var(--tg-overlay)] px-4 pt-[12vh]"} onMouseDown={(e) => !inline && e.target === e.currentTarget && onClose()}>
+      <div role={inline ? "search" : "dialog"} aria-modal={inline ? undefined : true} aria-label="Search and ask" className={`anim-in w-full overflow-hidden rounded-[18px] bg-panel ${inline ? "" : "max-w-xl shadow-2xl"}`} style={{ boxShadow: "var(--tg-ring)" }}>
         <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
           {mode === "ask" ? <Sparkles size={16} className="text-accent" aria-hidden /> : <Search size={16} className="text-muted" aria-hidden />}
           <label htmlFor="palette" className="sr-only">{mode === "ask" ? "Ask a question about your notes" : "Search tasks, notes and pages"}</label>
@@ -135,7 +135,7 @@ export function CommandPalette({ open, onClose, initialMode = "search" }: { open
           {canAsk && (
             <div className="flex flex-none rounded-md border border-line p-0.5 text-xs" role="tablist" aria-label="Mode">
               {(["search", "ask"] as const).map((m) => (
-                <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => switchMode(m)} className={`rounded px-2 py-0.5 capitalize ${mode === m ? "bg-[#232838] text-fg" : "text-muted hover:text-fg"}`}>
+                <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => switchMode(m)} className={`rounded px-2 py-0.5 capitalize ${mode === m ? "bg-[var(--tg-chip)] text-fg" : "text-muted hover:text-fg"}`}>
                   {m}
                 </button>
               ))}
@@ -155,13 +155,13 @@ export function CommandPalette({ open, onClose, initialMode = "search" }: { open
                   </li>
                 )}
                 <li role="option" aria-selected={i === sel}>
-                  <button type="button" onMouseEnter={() => setSel(i)} onClick={() => pick(i)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${i === sel ? "bg-[#1a1f2b]" : ""}`}>
+                  <button type="button" onMouseEnter={() => setSel(i)} onClick={() => pick(i)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${i === sel ? "bg-[var(--tg-chip)]" : ""}`}>
                     {it.icon === "note" ? (
                       <FileText size={15} className="flex-none text-muted" aria-hidden />
                     ) : it.icon === "task" && it.group ? (
                       <CheckSquare size={15} className="flex-none text-muted" aria-hidden />
                     ) : (
-                      <span className="h-3.5 w-3.5 flex-none rounded-full border-2 border-[#4b5263]" />
+                      <span className="h-3.5 w-3.5 flex-none rounded-full border-2 border-[var(--tg-check)]" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{it.label}</span>
@@ -230,7 +230,7 @@ function AskPanel({ q, state, onSubmit, onOpen }: { q: string; state: UseMutatio
           const m = p.match(/^\[(\d{1,2})\]$/);
           const s = m ? byN.get(Number(m[1])) : undefined;
           return s ? (
-            <button key={i} type="button" onClick={() => onOpen(s)} title={s.title} aria-label={`Source ${s.n}: ${s.title}`} className="mx-0.5 rounded bg-[#232838] px-1 align-[1px] font-mono text-[11px] text-accent hover:bg-[#2c3246]">
+            <button key={i} type="button" onClick={() => onOpen(s)} title={s.title} aria-label={`Source ${s.n}: ${s.title}`} className="mx-0.5 rounded bg-[var(--tg-chip)] px-1 align-[1px] font-mono text-[11px] text-accent hover:bg-[var(--tg-check)]">
               {s.n}
             </button>
           ) : (
@@ -244,7 +244,7 @@ function AskPanel({ q, state, onSubmit, onOpen }: { q: string; state: UseMutatio
           <ul className="m-0 list-none space-y-0.5 p-0">
             {list.map((s) => (
               <li key={s.n}>
-                <button type="button" onClick={() => onOpen(s)} className="flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-[#1a1f2b]">
+                <button type="button" onClick={() => onOpen(s)} className="flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--tg-chip)]">
                   <span className="mt-0.5 w-3 flex-none font-mono text-[11px] text-accent">{s.n}</span>
                   {s.kind === "task" ? <CheckSquare size={14} className="mt-0.5 flex-none text-muted" aria-hidden /> : <FileText size={14} className="mt-0.5 flex-none text-muted" aria-hidden />}
                   <span className="min-w-0 flex-1">

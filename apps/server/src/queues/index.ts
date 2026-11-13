@@ -32,6 +32,7 @@ async function handle(ctx: AppContext, hooks: Hooks, data: JobData) {
       return r;
     }
     case "nag": {
+      if (ctx.settings.pausedUntil()) return; // "Pause all reminders" from the app
       if (!hooks.notifier) return;
       const r = await runNagTick(ctx.db, hooks.notifier, ctx.nag);
       if (r.sent || r.errors) console.info(`[nag] sent ${r.sent}/${r.due} due (${r.evaluated} evaluated, ${r.errors} errors)`);

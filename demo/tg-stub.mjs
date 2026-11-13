@@ -30,7 +30,7 @@ export function telegramStub({ initData, dark }) {
       // by lifting the page's fixed bottom bars above it instead of covering them.
       let st = document.getElementById('__tg_main_space');
       if (!st) { st = document.createElement('style'); st.id = '__tg_main_space'; document.head.appendChild(st); }
-      st.textContent = main._s.visible ? '.tg .fixed.bottom-0{bottom:74px!important} .tg{padding-bottom:74px}' : '';
+      st.textContent = main._s.visible ? '.tg .fixed.bottom-0,.tg .sticky.bottom-0{bottom:74px!important} .tg{padding-bottom:74px}' : '';
       el.style.background = main._s.color || theme.button_color; el.style.color = main._s.textColor || theme.button_text_color; el.style.opacity = main._s.active ? '1' : '.5';
       el.textContent = main._s.progress ? '…' : main._s.text;
     }

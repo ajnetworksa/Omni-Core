@@ -1,6 +1,6 @@
+import { AppLink as Link } from "../app/platform";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
-import { Link } from "react-router";
 import { useState } from "react";
 import { aiErrorText, api, ApiError, refreshAll } from "../lib/api";
 import type { TodayBoard } from "../lib/types";
@@ -61,7 +61,7 @@ export function DailyNote({ board }: { board: TodayBoard }) {
           return (
             <div key={i} className="flex gap-2.5">
               <span className="flex-none font-mono text-xs text-faint">{m?.[1] ?? ""}</span>
-              <span className="text-[#c9cdd6]">{(m?.[2] ?? e).replace(/!\[\[(.+?)\]\]/g, "[attachment]")}</span>
+              <span className="text-fg-2">{(m?.[2] ?? e).replace(/!\[\[(.+?)\]\]/g, "[attachment]")}</span>
             </div>
           );
         })}
@@ -106,7 +106,7 @@ export function DailyNote({ board }: { board: TodayBoard }) {
         </dl>
       )}
       {next && (
-        <div className="rounded-[10px] border border-[#2d2748] bg-[#15131f] p-3 text-[12.5px] leading-relaxed text-[#c9c3f5]">
+        <div className="rounded-[10px] border border-line bg-[var(--tg-accent-soft)] p-3 text-[12.5px] leading-relaxed text-fg-2">
           Next nudge: <b className="text-fg">{next.title}</b>
           {new Date(next.nag!.nextAt!).getTime() <= Date.now() ? " · due now (queued)" : ` · ${new Date(next.nag!.nextAt!).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`}
         </div>

@@ -1,7 +1,7 @@
+import { useAppNavigate as useNavigate } from "../app/platform";
 import { useQuery } from "@tanstack/react-query";
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type SimulationNodeDatum } from "d3-force";
 import { useMemo } from "react";
-import { useNavigate } from "react-router";
 import { api } from "../lib/api";
 
 interface N extends SimulationNodeDatum { id: string; title: string; degree: number; orphan: boolean; daily: boolean }
@@ -40,18 +40,18 @@ export function Graph() {
         {layout && (
           <svg role="img" aria-label="Note link graph" viewBox={`${layout.box.x} ${layout.box.y} ${layout.box.w} ${layout.box.h}`} className="h-full w-full">
             {layout.links.map((l, i) => (
-              <line key={i} x1={l.source.x} y1={l.source.y} x2={l.target.x} y2={l.target.y} stroke="#2a3040" strokeWidth={1.2} />
+              <line key={i} x1={l.source.x} y1={l.source.y} x2={l.target.x} y2={l.target.y} stroke="var(--tg-check)" strokeWidth={1.2} />
             ))}
             {layout.nodes.map((n) => (
               <g key={n.id} transform={`translate(${n.x},${n.y})`} className="cursor-pointer" onClick={() => navigate(`/notes/${n.id}`)} role="link" aria-label={n.title} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && navigate(`/notes/${n.id}`)}>
-                <circle r={9 + Math.min(n.degree, 8) * 2.5} fill={n.orphan ? "#3a4050" : n.daily ? "#38bdf8" : "var(--color-accent)"} opacity={n.orphan ? 0.8 : 1} stroke="#0e1117" strokeWidth={3} />
-                <text y={24 + Math.min(n.degree, 8) * 2.5} textAnchor="middle" fontSize={13} fontWeight={500} fill={n.orphan ? "#8a91a0" : "#d4d7de"}>{n.title}</text>
+                <circle r={9 + Math.min(n.degree, 8) * 2.5} fill={n.orphan ? "var(--tg-check)" : n.daily ? "var(--tg-warn-dot)" : "var(--tg-accent)"} opacity={n.orphan ? 0.8 : 1} stroke="var(--tg-bg)" strokeWidth={3} />
+                <text y={24 + Math.min(n.degree, 8) * 2.5} textAnchor="middle" fontSize={13} fontWeight={500} fill={n.orphan ? "var(--tg-hint)" : "var(--tg-fg)"}>{n.title}</text>
               </g>
             ))}
           </svg>
         )}
       </div>
-      <p className="m-0 text-xs text-muted"><span className="text-accent-soft">●</span> notes · <span className="text-[#38bdf8]">●</span> daily notes · <span className="text-[#6b7280]">●</span> unlinked</p>
+      <p className="m-0 text-xs text-muted"><span className="text-accent-soft">●</span> notes · <span className="text-[var(--tg-warn-dot)]">●</span> daily notes · <span className="text-[var(--tg-check)]">●</span> unlinked</p>
     </div>
   );
 }

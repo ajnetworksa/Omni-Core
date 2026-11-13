@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { mkdir, readFile, readdir, realpath, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { uuid } from "../util/hash.js";
@@ -95,6 +95,30 @@ export class Vault {
     const tmp = join(dirname(target), `.${uuid()}.omnicore.tmp`);
     await writeFile(tmp, data);
     await rename(tmp, target);
+  }
+
+  /**
+   * Move a file into `.trash/` (Obsidian's own trash folder, so Obsidian shows it there too).
+   * Returns the trash path, e.g. `.trash/projects/emo.md` (with a time suffix if that's taken).
+   */
+  async moveToTrash(rel: string): Promise<string> {
+    const src = await this.writablePath(rel);
+    let trashRel = `.trash/${this.rel(src)}`;
+    if (existsSync(this.abs(trashRel))) trashRel = trashRel.replace(/(\.[^./]+)?$/, (ext) => `.${Date.now()}${ext}`);
+    const dst = this.abs(trashRel);
+    await mkdir(dirname(dst), { recursive: true });
+    await rename(src, dst);
+    return trashRel;
+  }
+
+  /** Put a trashed file back (refuses to overwrite a file that has since been created). */
+  async restoreFromTrash(trashRel: string, rel: string): Promise<void> {
+    if (!trashRel.startsWith(".trash/")) throw new VaultPathError(`Not a trash path: ${trashRel}`);
+    const src = this.abs(trashRel);
+    const dst = await this.writablePath(rel);
+    if (existsSync(dst)) throw new VaultPathError(`${rel} exists again; not overwriting it`);
+    await mkdir(dirname(dst), { recursive: true });
+    await rename(src, dst);
   }
 
   async listMarkdown(): Promise<string[]> {

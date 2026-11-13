@@ -22,6 +22,7 @@ import {
   taskDetail,
   TaskLineConflictError,
   TaskNotFoundError,
+  UndoExpiredError,
   todayBoard,
   todayView,
   upcoming,
@@ -41,6 +42,9 @@ import {
   type Session,
 } from "../auth.js";
 import type { AppContext } from "../context.js";
+import { SettingError } from "../settings.js";
+import { backupNow, listBackups } from "../snapshot.js";
+import { getMiniAppUrl } from "../telegram/format.js";
 import { AuthThrottle, tokenMatches } from "../security.js";
 import { aiFeatures, embedHealth, runDigest, runEmbedSync } from "../ai.js";
 import { updateInfo } from "../version.js";
@@ -93,7 +97,7 @@ declare module "fastify" {
   }
 }
 
-export async function apiRoutes(app: FastifyInstance, ctx: AppContext) {
+export async function apiRoutes(app: FastifyInstance, ctx: AppContext, opts: { telegramStatus?: () => string } = {}) {
   const { db, config } = ctx;
   const throttle = new AuthThrottle();
   const clientKey = (req: FastifyRequest) =>
@@ -104,7 +108,8 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext) {
     if (err instanceof TaskNotFoundError) return reply.status(404).send({ error: "not_found" });
     if (err instanceof TaskLineConflictError) return reply.status(409).send({ error: "conflict", message: err.message });
     if (err instanceof NoteConflictError) return reply.status(409).send({ error: "note_conflict", checksum: err.currentChecksum });
-    if (err instanceof VaultPathError) return reply.status(400).send({ error: "invalid_path" });
+    if (err instanceof VaultPathError) return reply.status(400).send({ error: "invalid_path", message: err.message });
+    if (err instanceof UndoExpiredError) return reply.status(410).send({ error: "undo_expired", message: err.message });
     if (err instanceof AiUnavailableError) {
       return reply.status(err.reason === "busy" ? 429 : 503).send({ error: "ai_unavailable", reason: err.reason, message: err.message });
     }
@@ -213,6 +218,8 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext) {
       const action = z.enum(TASK_ACTIONS).parse(req.params.action);
       return applyTaskAction(ctx.tasks, req.params.id, action, { tomorrowTime: config.TOMORROW_TIME });
     });
+    api.delete<{ Params: { id: string } }>("/tasks/:id", async (req) => ctx.tasks.delete(req.params.id));
+    api.post("/undo", async (req) => ctx.tasks.restore(z.object({ token: z.string().min(8).max(64) }).parse(req.body).token));
     api.post<{ Params: { id: string } }>("/tasks/:id/remarks", async (req) =>
       ctx.tasks.addRemark(req.params.id, Text(4000).parse(req.body).text, req.session?.k === "tg" ? "telegram" : "web"),
     );
@@ -225,6 +232,9 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext) {
       const stats = projectStats(db, nag()).find((p) => p.slug === r.slug);
       return reply.status(r.created ? 201 : 200).send({ ...stats, path: r.path, created: r.created });
     });
+    api.delete<{ Params: { slug: string }; Querystring: { keepTasks?: string } }>("/projects/:slug", async (req) =>
+      ctx.tasks.deleteProject(req.params.slug, { keepTasks: req.query.keepTasks !== "false" && req.query.keepTasks !== "0" }),
+    );
     api.get<{ Params: { slug: string } }>("/projects/:slug", async (req, reply) => {
       const p = db.select().from(projects).where(eq(projects.slug, req.params.slug)).get();
       if (!p) return reply.status(404).send({ error: "not_found" });
@@ -257,6 +267,11 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext) {
       await ctx.tasks.writeNote(n.path, body.content, body.checksum);
       return noteDetail(db, req.params.id, nag());
     });
+    api.delete<{ Params: { id: string } }>("/notes/:id", async (req, reply) => {
+      const n = db.select().from(notes).where(eq(notes.id, req.params.id)).get();
+      if (!n) return reply.status(404).send({ error: "not_found" });
+      return ctx.tasks.deleteNote(n.path);
+    });
     api.post("/notes", async (req, reply) => {
       const body = z.object({ title: z.string().min(1).max(200), content: z.string().max(512 * 1024).default("") }).parse(req.body);
       const path = await ctx.tasks.captureNote(body.title, body.content);
@@ -266,6 +281,51 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext) {
     api.post("/log", async (req) => ({ path: await ctx.tasks.appendLog(Text(4000).parse(req.body).text) }));
 
     api.get("/version", async () => ({ ...updateInfo(), updateCommand: "scripts/update.sh" }));
+
+    // --- settings (Settings page) and system info
+    api.get("/prefs", async () => ctx.settings.prefs());
+    api.get("/settings", async () => ({
+      groups: ctx.settings.describe(ctx.appliedSettings),
+      timezones: Intl.supportedValuesOf("timeZone"),
+      canRestart: process.env.OMNICORE_DOCKER === "1",
+    }));
+    api.put("/settings", async (req, reply) => {
+      const body = z.object({ values: z.record(z.string(), z.union([z.string().max(200), z.null()])) }).parse(req.body);
+      try {
+        const r = ctx.settings.set(body.values);
+        // Read-per-use settings take effect now.
+        if ("tomorrowTime" in body.values) config.TOMORROW_TIME = ctx.settings.get("tomorrowTime");
+        return { ...r, groups: ctx.settings.describe(ctx.appliedSettings) };
+      } catch (e) {
+        if (e instanceof SettingError) return reply.status(400).send({ error: "invalid_setting", message: e.message });
+        throw e;
+      }
+    });
+    api.post("/settings/restart", async (_req, reply) => {
+      if (process.env.OMNICORE_DOCKER !== "1") return reply.status(409).send({ error: "manual_restart", message: "Restart the app yourself to apply (outside Docker it can't restart itself)." });
+      setTimeout(() => process.kill(process.pid, "SIGTERM"), 400).unref();
+      return { restarting: true };
+    });
+    api.post("/reminders/pause", async (req) => {
+      const { minutes } = z.object({ minutes: z.number().int().min(0).max(14 * 24 * 60) }).parse(req.body);
+      ctx.settings.pause(minutes ? new Date(Date.now() + minutes * 60_000) : null);
+      return { pausedUntil: ctx.settings.pausedUntil() };
+    });
+    api.get("/system", async () => ({
+      version: updateInfo(),
+      updateCommand: "scripts/update.sh",
+      telegram: { status: opts.telegramStatus?.() ?? "disabled", miniApp: !!getMiniAppUrl() },
+      ai: { ...aiFeatures(ctx), model: config.AI_PROVIDER === "none" ? null : config.AI_CHAT_MODEL },
+      counts: {
+        tasks: (db.$client.prepare("SELECT count(*) AS n FROM tasks WHERE status NOT IN ('done','cancelled')").get() as { n: number }).n,
+        done: (db.$client.prepare("SELECT count(*) AS n FROM tasks WHERE status = 'done'").get() as { n: number }).n,
+        notes: (db.$client.prepare("SELECT count(*) AS n FROM notes").get() as { n: number }).n,
+        projects: (db.$client.prepare("SELECT count(*) AS n FROM projects").get() as { n: number }).n,
+      },
+      backups: listBackups(config.DATABASE_PATH).slice(0, 5),
+      docker: process.env.OMNICORE_DOCKER === "1",
+    }));
+    api.post("/backup", async () => backupNow(config.DATABASE_PATH));
 
     // --- AI
     const deps = () => ({ db, ai: ctx.ai, semantic: ctx.semantic, nag: ctx.nag });

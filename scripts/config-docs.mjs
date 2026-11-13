@@ -47,7 +47,7 @@ for (let i = 0; i < lines.length; i++) {
 const bySection = new Map();
 for (const r of rows) bySection.set(r.section, [...(bySection.get(r.section) ?? []), r]);
 const esc = (s) => s.replace(/\|/g, "\\|");
-let out = `# Configuration\n\nEvery setting is an environment variable, normally set in \`.env\` (copy \`.env.example\`).\nThis file is generated from \`apps/server/src/config.ts\` by \`node scripts/config-docs.mjs\`; don't edit it by hand.\n\nInvalid values stop the server at startup with a message naming the setting.\n`;
+let out = `# Configuration\n\nEvery setting is an environment variable, normally set in \`.env\` (copy \`.env.example\`).\nThe everyday ones (reminders, quiet hours, summaries, time zone, weekend…) can also be changed in the app under **Settings**; those are stored in the database and override \`.env\`.\nThis file is generated from \`apps/server/src/config.ts\` by \`node scripts/config-docs.mjs\`; don't edit it by hand.\n\nInvalid values stop the server at startup with a message naming the setting.\n`;
 for (const [sec, list] of bySection) {
   out += `\n## ${sec}\n\n| Setting | Default | What it does |\n|---|---|---|\n`;
   for (const r of list) {

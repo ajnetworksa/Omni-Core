@@ -3,11 +3,11 @@
 **Self-hosted notes + tasks + a Telegram bot that keeps reminding you until things are done.**
 Your data stays plain Markdown (Obsidian-compatible). The AI runs locally.
 
-![Today in the web app](docs/screenshots/ui/web-1-today.png)
+![Today in the web app](docs/screenshots/ui/v6-web-2-today.png)
 
-| | |
-|---|---|
-| ![Ask your notes](docs/screenshots/ui/ai-ask.png) | ![Telegram: ask, voice → tasks, photo → note](docs/screenshots/ui/ai-telegram.png) |
+| Telegram Mini App | A task | Settings |
+|---|---|---|
+| ![Today in Telegram](docs/screenshots/ui/v6-tg-1-today.png) | ![A task, in Telegram](docs/screenshots/ui/v6-tg-4-task.png) | ![Settings](docs/screenshots/ui/v6-web-7-settings.png) |
 
 ## What it does
 
@@ -15,9 +15,11 @@ Your data stays plain Markdown (Obsidian-compatible). The AI runs locally.
   - Any `- [ ] task` in any note is a task.
   - The web app, Telegram and Obsidian all edit the same `.md` files.
   - Links, backlinks and a graph.
-- **Reminders that don't give up.** Overdue tasks get a Telegram ping every 30 min until you tap ✅ Done, report progress, add a remark or snooze. Unfinished tasks roll over at midnight and escalate.
+- **Reminders that don't give up.** When a task's time comes you get a Telegram message, and another every 30 min until you tap ✅ Done, say it's partly done, add an update ("waiting for parts") or push it later. Unfinished tasks move to the next day at midnight. Pause everything for a meeting or a holiday.
 - **Capture from your phone.** `/todo`, `+ quick task`, notes, voice notes (transcribed, and the tasks you mention are offered for one tap), photos (labels and specs read into a note).
-- **Web app + Telegram Mini App.** Today, Upcoming, Inbox, Board, Notes, Graph, ⌘K search.
+- **One app on the web and in Telegram.** The same screens and plain words in both: Today, Upcoming, Projects, Notes, Board, Map, search. A welcome guide and a Help page explain everything.
+- **Settings in the app.** Reminder rhythm, quiet hours, daily summaries, time zone, light/dark and accent colour, backups, and how to update. No `.env` editing needed for any of these.
+- **Delete with Undo.** Tasks, projects (keep or delete their tasks) and notes (moved to the vault's `.trash`).
 - **Local AI** (Ollama):
   - "Ask" your notes, with sources;
   - break a task into subtasks;

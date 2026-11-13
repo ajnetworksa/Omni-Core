@@ -33,7 +33,7 @@ export async function buildHttp(
     const base = { ok: true, time: new Date().toISOString(), telegram: opts.telegramStatus?.() ?? "disabled" };
     return !viaProxy && isPrivateAddress(req.socket.remoteAddress ?? "") ? { ...base, version: VERSION.version, sha: VERSION.sha } : base;
   });
-  await app.register((api) => apiRoutes(api, ctx), { prefix: "/api" });
+  await app.register((api) => apiRoutes(api, ctx, { telegramStatus: opts.telegramStatus }), { prefix: "/api" });
 
   // Web app + Telegram Mini App: one single-page app; /tg/* is the Mini App.
   const webDist = resolve(config.WEB_DIST ?? join(dirname(fileURLToPath(import.meta.url)), "../../web/dist"));

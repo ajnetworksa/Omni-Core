@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
 import type { DB } from "../db/client.js";
-import { notes, tasks, type Remark, type Task, type TaskStatus } from "../db/schema.js";
+import { notes, projects, tasks, type Remark, type Task, type TaskStatus } from "../db/schema.js";
 import { detectEol, splitLines } from "../markdown/parse.js";
 import {
   appendAnchor,
@@ -28,6 +29,8 @@ export class NoteConflictError extends Error {
   }
 }
 /** The task's line could not be located in its file (file was edited externally). */
+export class UndoExpiredError extends Error {}
+
 export class TaskLineConflictError extends Error {}
 
 export interface TaskPatch {
@@ -274,6 +277,130 @@ export class TaskService {
   async writeSection(path: string, heading: string, body: string, now = new Date()): Promise<void> {
     const today = todayInTz(this.timeZone, now);
     await this.withNote(path, today, (raw) => replaceSection(raw, heading, body));
+  }
+
+  // ---------- delete & undo ----------
+
+  /** Deleted things, kept for Undo (in memory, 15 minutes). */
+  private readonly undo = new Map<string, { at: number; kind: "task"; path: string; index: number; lines: string[] } | { at: number; kind: "file"; path: string; trash: string }>();
+  private keepForUndo(entry: Parameters<typeof this.undo.set>[1]): string {
+    const now = Date.now();
+    for (const [k, v] of this.undo) if (now - v.at > 15 * 60_000) this.undo.delete(k);
+    const token = randomBytes(9).toString("base64url");
+    this.undo.set(token, entry);
+    return token;
+  }
+
+  /**
+   * Delete a task: its line and everything indented under it (subtasks, notes) leave the file.
+   * Returns an undo token; `restore(token)` puts the lines back where they were (same id, remarks kept).
+   */
+  async delete(id: string): Promise<{ title: string; removed: number; undo: string | null }> {
+    const task = this.get(id);
+    const note = task.noteId ? this.db.select().from(notes).where(eq(notes.id, task.noteId)).get() : undefined;
+    if (!note) {
+      this.db.delete(tasks).where(or(eq(tasks.id, id), eq(tasks.parentTaskId, id))).run();
+      return { title: task.title, removed: 1, undo: null };
+    }
+    return this.indexer.lock.run(note.path, async () => {
+      const raw = await this.indexer.vault.read(note.path);
+      const lines = splitLines(raw);
+      const idx = locateLine(lines, task);
+      if (idx < 0) {
+        await this.indexer.indexFileUnlocked(note.path);
+        throw new TaskLineConflictError(`Could not locate line for task ${id} in ${note.path}`);
+      }
+      const indent = (l: string) => l.match(/^[ \t]*/)![0].replace(/\t/g, "    ").length;
+      const base = indent(lines[idx]!);
+      let end = idx + 1;
+      while (end < lines.length && lines[end]!.trim() !== "" && indent(lines[end]!) > base) end++;
+      const removed = lines.splice(idx, end - idx);
+      await this.indexer.vault.writeAtomic(note.path, lines.join(detectEol(raw)));
+      await this.indexer.indexFileUnlocked(note.path);
+      return { title: task.title, removed: removed.filter((l) => TASK_LINE_RE.test(l)).length, undo: this.keepForUndo({ at: Date.now(), kind: "task", path: note.path, index: idx, lines: removed }) };
+    });
+  }
+
+  /** Undo a delete (task, note or project). Returns what came back. */
+  async restore(token: string): Promise<{ kind: "task" | "file"; path: string }> {
+    const e = this.undo.get(token);
+    if (!e) throw new UndoExpiredError("Nothing to undo (it's been more than 15 minutes, or the server restarted)");
+    this.undo.delete(token);
+    if (e.kind === "file") {
+      await this.indexer.lock.run(e.path, async () => {
+        await this.indexer.vault.restoreFromTrash(e.trash, e.path);
+        await this.indexer.indexFileUnlocked(e.path);
+      });
+      return { kind: "file", path: e.path };
+    }
+    await this.indexer.lock.run(e.path, async () => {
+      const raw = (await this.indexer.vault.exists(e.path)) ? await this.indexer.vault.read(e.path) : "";
+      const lines = raw ? splitLines(raw) : [];
+      lines.splice(Math.min(e.index, lines.length), 0, ...e.lines);
+      await this.indexer.vault.writeAtomic(e.path, lines.join(raw ? detectEol(raw) : "\n"));
+      await this.indexer.indexFileUnlocked(e.path);
+    });
+    return { kind: "task", path: e.path };
+  }
+
+  /** Delete a note: the file moves to `.trash/` (Obsidian's trash), its tasks leave the index. */
+  async deleteNote(path: string): Promise<{ trash: string; undo: string }> {
+    return this.indexer.lock.run(path, async () => {
+      const trash = await this.indexer.vault.moveToTrash(path);
+      await this.indexer.removeFileUnlockedPublic(path);
+      return { trash, undo: this.keepForUndo({ at: Date.now(), kind: "file", path, trash }) };
+    });
+  }
+
+  /**
+   * Delete a project. Its note (projects/<slug>.md) goes to the trash. Its tasks elsewhere either
+   * stay (the #project/<slug> tag is removed) or are deleted too. With keepTasks, open tasks that
+   * lived inside the project note are moved to today's note first, so nothing open is lost.
+   */
+  async deleteProject(slug: string, opts: { keepTasks: boolean }): Promise<{ title: string; tasksDeleted: number; tasksKept: number }> {
+    const p = this.db.select().from(projects).where(eq(projects.slug, slug)).get();
+    if (!p) throw new TaskNotFoundError(`No project ${slug}`);
+    const tagged = this.db.select().from(tasks).where(eq(tasks.projectId, p.id)).all().filter((t) => !t.parentTaskId);
+    const notePath = `projects/${slug}.md`;
+    const projectNote = this.db.select().from(notes).where(eq(notes.path, notePath)).get();
+    let deleted = 0;
+    let kept = 0;
+    for (const t of tagged) {
+      const inProjectNote = projectNote && t.noteId === projectNote.id;
+      if (!opts.keepTasks) {
+        if (!inProjectNote) await this.delete(t.id);
+        deleted++;
+        continue;
+      }
+      kept++;
+      if (inProjectNote) {
+        if (t.status === "done" || t.status === "cancelled") continue;
+        const fresh = this.get(t.id);
+        await this.create({ text: [fresh.title, fresh.priority < 4 ? `!p${fresh.priority}` : "", fresh.dueDate ? `📅 ${fresh.dueDate}` : "", fresh.dueTime ?? "", ...fresh.tags.filter((x) => x !== `project/${slug}`).map((x) => `#${x}`)].filter(Boolean).join(" ") });
+      } else if (t.tags.includes(`project/${slug}`)) {
+        await this.untag(t.id, `project/${slug}`);
+      }
+    }
+    if (projectNote) await this.deleteNote(notePath);
+    this.db.delete(projects).where(eq(projects.id, p.id)).run();
+    return { title: p.title, tasksDeleted: deleted, tasksKept: kept };
+  }
+
+  /** Remove one #tag from a task's line. */
+  private async untag(id: string, tag: string): Promise<void> {
+    const task = this.get(id);
+    const note = task.noteId ? this.db.select().from(notes).where(eq(notes.id, task.noteId)).get() : undefined;
+    if (!note) return;
+    await this.indexer.lock.run(note.path, async () => {
+      const raw = await this.indexer.vault.read(note.path);
+      const lines = splitLines(raw);
+      const idx = locateLine(lines, task);
+      if (idx < 0) return;
+      const esc = tag.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+      lines[idx] = lines[idx]!.replace(new RegExp(`\\s#${esc}(?=\\s|$)`, "g"), "");
+      await this.indexer.vault.writeAtomic(note.path, lines.join(detectEol(raw)));
+      await this.indexer.indexFileUnlocked(note.path);
+    });
   }
 
   /**

@@ -84,3 +84,15 @@ The bot keeps a persistent reply keyboard and edits one message as you navigate 
 ### D19 · Quick tunnel for the Mini App (0.5.2)
 Telegram Mini Apps need https. `quicktunnel` runs cloudflared without an account; the app polls cloudflared's metrics `/quicktunnel` endpoint (only `*.trycloudflare.com` hostnames are accepted) and updates the menu button.
 **Trade-off:** no Cloudflare Access in front and a changing address, so it's documented as the quick start, with `tunnel` on your own domain as the permanent setup.
+
+### D20 · One app, one look (0.6)
+The web app and the Mini App are the same React screens (`apps/web/src/app/`) in Paper (mockup B), light by default with a matching dark theme. Layout adapts (sidebar ≥ 1000 px, tabs below / in Telegram); actions go through `usePrimary`/`useBack`, which become Telegram's native buttons in the Mini App.
+**Why:** the user found two different designs confusing and both "too basic". Two codebases also drifted (features on one side only, e.g. remarks were hard to find in the Mini App).
+
+### D21 · Settings live in the database (0.6)
+`settings` table, overriding `.env`; read before the config is parsed at start-up (`withStoredSettings`). Read-at-start settings are applied by restarting the process (Docker's `restart: unless-stopped` brings it back).
+**Why:** changing reminder rhythm or quiet hours shouldn't need SSH. Restarting is simpler and safer than making every timer reconfigurable live.
+
+### D22 · Delete = remove the lines, Undo = put them back (0.6)
+Deleting a task removes its line and everything indented under it; the block is kept in memory for 15 minutes for Undo, and the index's "graveyard" restores the same task id (so updates and reminder history come back). Notes go to `.trash/` (Obsidian's convention), never erased.
+**Why:** file-first means the file is the truth; a soft-delete flag would leave the task visible in Obsidian.

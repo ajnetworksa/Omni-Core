@@ -1,3 +1,4 @@
+import { SETTINGS, SettingsStore } from "./settings.js";
 import {
   AiClient,
   SemanticIndex,
@@ -22,6 +23,10 @@ export interface AppContext {
   ai: AiClient;
   /** Present when a local embedding model is configured and the index is enabled. */
   semantic?: SemanticIndex;
+  /** Settings changed in the app (override .env). */
+  settings: SettingsStore;
+  /** Effective value of each setting when this process started (to show "waiting for restart"). */
+  appliedSettings: Record<string, string>;
 }
 
 export function createContext(config: Config): AppContext {
@@ -54,5 +59,7 @@ export function createContext(config: Config): AppContext {
       /* ignore */
     }
   }
-  return { config, db, vault, indexer, tasks, nag, ai, semantic };
+  const settings = new SettingsStore(db, process.env);
+  const appliedSettings = Object.fromEntries(SETTINGS.map((d) => [d.key, settings.get(d.key)]));
+  return { config, db, vault, indexer, tasks, nag, ai, semantic, settings, appliedSettings };
 }

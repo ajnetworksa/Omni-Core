@@ -65,12 +65,12 @@ export const getMiniAppUrl = () => miniAppUrl;
 export function reminderKeyboard(taskId: string): InlineKeyboard {
   const kb = new InlineKeyboard()
     .text("✅ Done", `t:done:${taskId}`)
-    .text("🌗 Partial", `t:menu:${taskId}`)
-    .text("💬 Remark", `t:rem:${taskId}`)
+    .text("🌗 Partly done", `t:menu:${taskId}`)
+    .text("💬 Update", `t:rem:${taskId}`)
     .row()
-    .text("⏱ +1h", `t:snooze1h:${taskId}`)
+    .text("⏱ In 1 hour", `t:snooze1h:${taskId}`)
     .text("🌅 Tomorrow", `t:tomorrow:${taskId}`)
-    .text("🔕 Today", `t:mute:${taskId}`);
+    .text("🔕 Quiet today", `t:mute:${taskId}`);
   if (miniAppUrl) kb.row().webApp("📱 Open in app", `${miniAppUrl}/task/${encodeURIComponent(taskId)}`);
   return kb;
 }
@@ -82,6 +82,8 @@ export function partialKeyboard(taskId: string): InlineKeyboard {
     .text("75%", `t:p75:${taskId}`)
     .row()
     .text("▶️ Just started", `t:start:${taskId}`)
+    .row()
+    .text("🗑 Delete task", `t:del:${taskId}`)
     .text("⬅️ Back", `t:back:${taskId}`);
 }
 

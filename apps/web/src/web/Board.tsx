@@ -8,11 +8,11 @@ import { useOpenTask } from "./TaskRow";
 import { Chip, PriorityChip, ProgressBar } from "./ui";
 
 const COLUMNS: { id: Exclude<TaskStatus, "cancelled">; label: string; hint: string }[] = [
-  { id: "backlog", label: "Backlog", hint: "[ ] in the file" },
-  { id: "ready", label: "Ready", hint: "[ ]" },
-  { id: "in_progress", label: "In progress", hint: "[/]" },
-  { id: "blocked", label: "Blocked", hint: "[!]" },
-  { id: "done", label: "Done · 7 days", hint: "[x]" },
+  { id: "backlog", label: "Someday", hint: "no plan yet, no reminders" },
+  { id: "ready", label: "To do", hint: "ready to start" },
+  { id: "in_progress", label: "Doing", hint: "started or partly done" },
+  { id: "blocked", label: "Waiting", hint: "stuck on something" },
+  { id: "done", label: "Done", hint: "last 7 days" },
 ];
 
 export function Board() {
@@ -57,7 +57,7 @@ export function Board() {
 function Column({ col, cards }: { col: (typeof COLUMNS)[number]; cards: TaskCard[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   return (
-    <section ref={setNodeRef} aria-label={col.label} className={`flex min-h-[300px] flex-col gap-2 rounded-xl border p-2.5 transition ${isOver ? "border-accent/60 bg-[#15131f]" : "border-line bg-panel"}`}>
+    <section ref={setNodeRef} aria-label={col.label} className={`flex min-h-[300px] flex-col gap-2 rounded-xl border p-2.5 transition ${isOver ? "border-accent/60 bg-[var(--tg-accent-soft)]" : "border-line bg-panel"}`}>
       <div className="flex items-center justify-between px-1 pb-1">
         <h2 className="m-0 text-[13px] font-semibold">{col.label}</h2>
         <span className="text-xs text-faint">{cards.length}</span>

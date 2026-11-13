@@ -4,8 +4,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { api, refreshAll } from "../lib/api";
 import { dayLabel } from "../lib/format";
 import type { Parsed } from "../lib/types";
-import { suggestFor } from "./suggest";
-import { haptic, type TgWebApp } from "./telegram";
+import { haptic } from "../tg/telegram";
+import { suggestFor } from "../tg/suggest";
+import { useBack, usePlatform, usePrimary } from "./platform";
+import { Sheet, useToast } from "./ui";
 
 /**
  * New task sheet. Type freely; the word you're typing gets suggestions:
@@ -21,7 +23,9 @@ function wordAt(text: string, caret: number) {
   return m ? { word: m[1]!, start: caret - m[1]!.length } : { word: "", start: caret };
 }
 
-export function AddSheet({ tg, onClose, project }: { tg: TgWebApp | null; onClose: () => void; project?: { slug: string; title: string } }) {
+export function AddSheet({ onClose, project }: { onClose: () => void; project?: { slug: string; title: string } }) {
+  const { tg } = usePlatform();
+  const toast = useToast();
   const [text, setText] = useState("");
   const [caret, setCaret] = useState(0);
   const [parsed, setParsed] = useState<Parsed | null>(null);
@@ -76,27 +80,21 @@ export function AddSheet({ tg, onClose, project }: { tg: TgWebApp | null; onClos
     setError("");
     tg?.MainButton.showProgress();
     try {
-      await api.createIn(text.trim(), project?.slug);
+      const t = await api.createIn(text.trim(), project?.slug);
       haptic.ok();
       await refreshAll();
       onClose();
+      toast.show({ text: `Added: ${t.title}`, undo: async () => { const r = await api.deleteTask(t.id); return r; } });
     } catch {
       haptic.err();
       setError("Couldn't save it. Check the connection and try again.");
     } finally {
       tg?.MainButton.hideProgress();
     }
-  }, [text, tg, onClose, project]);
+  }, [text, tg, onClose, project, toast]);
 
-  useEffect(() => {
-    if (!tg) return;
-    tg.MainButton.setText(project ? `Add to ${project.title}` : "Add task").show();
-    if (text.trim()) tg.MainButton.enable(); else tg.MainButton.disable();
-    tg.MainButton.onClick(submit);
-    tg.BackButton.show();
-    tg.BackButton.onClick(onClose);
-    return () => { tg.MainButton.offClick(submit); tg.BackButton.offClick(onClose); tg.BackButton.hide(); };
-  }, [tg, submit, onClose, text, project]);
+  usePrimary({ label: project ? `Add to ${project.title}` : "Add task", onClick: () => void submit(), enabled: !!text.trim() }, [text, submit]);
+  useBack(onClose);
 
   const chips = parsed
     ? [
@@ -111,13 +109,7 @@ export function AddSheet({ tg, onClose, project }: { tg: TgWebApp | null; onClos
   const tools: [string, string, typeof CalendarDays][] = [["@", "Date", CalendarDays], ["", "Time", Clock], ["!", "Priority", Flag], ...(project ? [] : [["#project/", "Project", FolderOpen] as [string, string, typeof CalendarDays]]), ["every", "Repeat", Repeat]];
 
   return (
-    <div className="fixed inset-0 z-30 flex flex-col justify-end" style={{ background: "rgba(20,20,24,.35)" }} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="New task" className="anim-in flex flex-col gap-3 rounded-t-[24px] px-5 pb-5 pt-3" style={{ background: "var(--tg-section)", boxShadow: "0 -8px 30px rgba(0,0,0,.12)" }}>
-        <div className="mx-auto h-1 w-10 rounded-full" style={{ background: "var(--tg-check)" }} aria-hidden />
-        <div className="flex items-baseline justify-between">
-          <h2 className="m-0 font-display text-[19px] font-extrabold tracking-tight">New task</h2>
-          {project && <span className="text-[13px] font-medium" style={{ color: "var(--tg-link)" }}>in {project.title}</span>}
-        </div>
+    <Sheet title="New task" onClose={onClose} side={project && <span className="text-[13px] font-medium" style={{ color: "var(--tg-link)" }}>in {project.title}</span>}>
         <label htmlFor="tg-add" className="sr-only">Task</label>
         <textarea
           id="tg-add"
@@ -185,7 +177,7 @@ export function AddSheet({ tg, onClose, project }: { tg: TgWebApp | null; onClos
             </>
           ) : (
             <span className="text-[12.5px]" style={{ color: "var(--tg-hint)" }}>
-              Type <b>@</b> for a date, <b>!</b> for priority, <b>#</b> for a project — or tap a chip.
+              Just type what needs doing. To add a date, priority or project, tap a chip above (or type <b>@</b>, <b>!</b> or <b>#</b>).
             </span>
           )}
         </div>
@@ -195,7 +187,6 @@ export function AddSheet({ tg, onClose, project }: { tg: TgWebApp | null; onClos
             {project ? `Add to ${project.title}` : "Add task"}
           </button>
         )}
-      </div>
-    </div>
+    </Sheet>
   );
 }

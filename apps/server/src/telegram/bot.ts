@@ -51,8 +51,6 @@ export function createBot(app: AppContext, botConfig?: BotConfig<Context>): Bot 
   const bot = new Bot(config.TELEGRAM_BOT_TOKEN!, { ...botConfig, client: { apiRoot, ...botConfig?.client } });
   const allowed = new Set(config.TELEGRAM_ALLOWED_USER_IDS);
   const warned = new Set<number>();
-  /** `${chatId}:${promptMessageId}` → taskId for "reply with your remark" prompts. */
-  const pendingRemarks = new Map<string, string>();
 
   // --- auth: only allow-listed users; tell strangers their id so setup is easy ---
   bot.use(async (ctx, next) => {
@@ -235,6 +233,16 @@ export function createBot(app: AppContext, botConfig?: BotConfig<Context>): Bot 
   });
 
   // --- inline keyboards ---
+  bot.callbackQuery(/^undo:([A-Za-z0-9_-]+)$/, async (ctx) => {
+    try {
+      await app.tasks.restore(ctx.match![1]!);
+      await ctx.answerCallbackQuery("Restored");
+      await ctx.editMessageText("↩️ Restored.").catch(() => {});
+    } catch (e) {
+      await ctx.answerCallbackQuery((e as Error).message.slice(0, 180));
+    }
+  });
+
   bot.callbackQuery(/^t:([a-z0-9]+):(.+)$/, async (ctx) => {
     const [, action, id] = ctx.match as RegExpMatchArray as [string, string, string];
     const msg = ctx.callbackQuery.message;
@@ -242,14 +250,21 @@ export function createBot(app: AppContext, botConfig?: BotConfig<Context>): Bot 
 
     if (action === "menu") return void (await ctx.editMessageReplyMarkup({ reply_markup: partialKeyboard(id) }), await ctx.answerCallbackQuery());
     if (action === "back") return void (await ctx.editMessageReplyMarkup({ reply_markup: reminderKeyboard(id) }), await ctx.answerCallbackQuery());
+    if (action === "del") {
+      const task = app.tasks.get(id);
+      await ctx.answerCallbackQuery();
+      return void (await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard().text(`🗑 Yes, delete “${task.title.slice(0, 24)}”`, `t:delok:${id}`).row().text("⬅️ No, keep it", `t:back:${id}`) }));
+    }
+    if (action === "delok") {
+      const r = await app.tasks.delete(id);
+      await ctx.answerCallbackQuery("Deleted");
+      const kb = r.undo ? new InlineKeyboard().text("↩️ Undo", `undo:${r.undo}`) : undefined;
+      return void (await ctx.editMessageText(`🗑 <s>${esc(r.title)}</s>\nDeleted${r.removed > 1 ? ` with ${r.removed - 1} subtask${r.removed > 2 ? "s" : ""}` : ""}. You can undo this for 15 minutes.`, { parse_mode: "HTML", reply_markup: kb }));
+    }
     if (action === "rem") {
       const task = app.tasks.get(id);
-      const prompt = await ctx.reply(`💬 Remark for <b>${esc(task.title)}</b>\nReply to this message with the update.`, {
-        parse_mode: "HTML",
-        reply_markup: { force_reply: true, input_field_placeholder: "e.g. Awaiting parts delivery" },
-      });
-      pendingRemarks.set(`${prompt.chat.id}:${prompt.message_id}`, id);
-      return void (await ctx.answerCallbackQuery());
+      await ctx.answerCallbackQuery();
+      return void (await menus.askRemark(ctx, id, task.title));
     }
     if (!(TASK_ACTIONS as readonly string[]).includes(action)) return void (await ctx.answerCallbackQuery("Unknown action"));
 
@@ -347,13 +362,6 @@ export function createBot(app: AppContext, botConfig?: BotConfig<Context>): Bot 
   // --- plain text: remark replies, "+ task", or a log line ---
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
-    const reply = ctx.message.reply_to_message;
-    const pending = reply && pendingRemarks.get(`${ctx.chat.id}:${reply.message_id}`);
-    if (pending) {
-      pendingRemarks.delete(`${ctx.chat.id}:${reply!.message_id}`);
-      const t = app.tasks.addRemark(pending, text, "telegram");
-      return html(ctx, `💬 Remark added to <b>${esc(t.title)}</b>.\nI'll follow up on it instead of the usual overdue pings.`);
-    }
     if (await menus.handleText(ctx)) return;
     if (/^\+\s*\S/.test(text)) {
       const t = await app.tasks.create({ text: text.replace(/^\+\s*/, "") });

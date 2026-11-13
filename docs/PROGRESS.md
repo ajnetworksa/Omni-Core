@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-11-12 · version 0.5.3._ Update this file whenever you finish, start or drop something.
+_Last updated: 2026-11-12 · version 0.6.0._ Update this file whenever you finish, start or drop something.
 
 ## Status by phase
 

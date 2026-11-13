@@ -83,3 +83,38 @@ export interface VersionInfo {
   updateAvailable: boolean;
   updateCommand: string;
 }
+
+export interface Prefs {
+  name: string;
+  theme: "light" | "dark" | "auto";
+  accent: "blue" | "teal" | "violet" | "pink";
+  startScreen: "today" | "upcoming" | "projects";
+  weekStart: "sat" | "sun" | "mon";
+  timeFormat: "24h" | "12h";
+  pausedUntil: string | null;
+}
+export interface SettingItem {
+  key: string;
+  label: string;
+  help: string;
+  type: "text" | "time" | "optional-time" | "timezone" | "select" | "minutes" | "quiet-hours" | "weekdays";
+  options?: { value: string; label: string }[];
+  value: string;
+  source: "app" | "env" | "default";
+  restart: boolean;
+  pending: boolean;
+}
+export interface SettingsPage {
+  groups: { id: string; title: string; items: SettingItem[] }[];
+  timezones: string[];
+  canRestart: boolean;
+}
+export interface SystemInfo {
+  version: VersionInfo;
+  updateCommand: string;
+  telegram: { status: string; miniApp: boolean };
+  ai: { ask: boolean; model: string | null } & Record<string, unknown>;
+  counts: { tasks: number; done: number; notes: number; projects: number };
+  backups: { name: string; bytes: number; at: string }[];
+  docker: boolean;
+}

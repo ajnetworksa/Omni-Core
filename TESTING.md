@@ -200,3 +200,15 @@ Not tested here: the real `ollama/ollama` and `cloudflared` images, and a real `
 `node demo/ui-session.mjs` (demo server) then `node demo/peek-tg2.mjs /tmp` drives the Mini App in Chrome with a Telegram stand-in set to **dark** mode. 14/14 checks:
 Paper light by default; Telegram header and main button painted Paper; `@` → dates; `18` → 18:00; `!` → priorities; `#ho` → the Homelab project; the tapped text reads `… @tomorrow 18:00 !p1 #project/homelab` and saves with that date, time, priority and project; Projects → New project → opens it → "Add to Garden shed" writes into `projects/garden-shed.md`; Paper night toggle, remembered after reload.
 Unit tests: `apps/server/test/suggest.test.ts`. Found and fixed during the walkthrough: typing straight after tapping a suggestion could land before the inserted text (the cursor is now placed before the next paint).
+
+## 0.6.0 — one app, settings, delete (2026-11-13)
+
+Suites: core 98 · server 71 · E2E 56 · security 26 · AI 25 — all pass.
+New unit tests: `packages/core/test/delete.test.ts` (task delete + exact undo with same id and updates; note → `.trash` and back; project delete keeping or deleting tasks), `apps/server/test/settings.test.ts` (plain-language validation, API save, override of `.env` across a restart, reset, pause, backup now), Telegram: update without swipe-to-reply, 🗑 delete → confirm → undo.
+
+Browser walkthrough `node demo/peek-app.mjs <dir>` (after `node demo/ui-session.mjs`): **23/23**, no page errors.
+Web (desktop): sign-in says where the password is; welcome guide; same sections; "Needs you now"; task explains reminders; update and step saved; delete → Undo restores; theme and accent switch the whole app; reminder setting shows "waiting for a restart"; pause/resume; guide shows the real interval; board in plain words; notes.
+Mini App (phone, Telegram dark): same Today; Paper light; main button "New task" / "✓ Done"; More → Settings; update saved; Later → In 1 hour; delete returns to Today with Undo.
+Found and fixed by the walkthrough: after deleting, the task screen reloaded the deleted task (404) instead of going back; "Partly done" wrapped onto two lines.
+Docker: fresh build healthy; **Apply now** → the app restarted (restart count 1) and was back in ~3 s with the new reminder settings applied.
+Not tested here: real Telegram clients.

@@ -12,10 +12,12 @@ import { TelegramNotifier } from "./telegram/notifier.js";
 import { runDigest } from "./ai.js";
 import { checkForUpdate, newerThan, VERSION } from "./version.js";
 import { ensureApiToken } from "./token.js";
+import { withStoredSettings } from "./settings.js";
 import { watchQuickTunnel } from "./quicktunnel.js";
 
 async function main() {
-  const config = loadConfig();
+  // Settings changed in the app are stored in the database and override .env.
+  const config = loadConfig(await withStoredSettings(process.env));
   const generated = ensureApiToken(config);
   const ctx = createContext(config);
   let telegramStatus: "disabled" | "starting" | "running" | "failed" = "disabled";

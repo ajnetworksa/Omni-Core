@@ -1,6 +1,7 @@
 # Configuration
 
 Every setting is an environment variable, normally set in `.env` (copy `.env.example`).
+The everyday ones (reminders, quiet hours, summaries, time zone, weekend…) can also be changed in the app under **Settings**; those are stored in the database and override `.env`.
 This file is generated from `apps/server/src/config.ts` by `node scripts/config-docs.mjs`; don't edit it by hand.
 
 Invalid values stop the server at startup with a message naming the setting.

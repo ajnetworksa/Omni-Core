@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { VersionInfo, AiStatus, AskResult, AskSource, GraphData, NoteDetail, NoteListItem, Parsed, Project, ProjectDetail, TaskAction, TaskCard, TaskDetail, TodayBoard } from "./types";
+import type { VersionInfo, AiStatus, AskResult, AskSource, GraphData, NoteDetail, NoteListItem, Parsed, Prefs, Project, ProjectDetail, SettingsPage, SystemInfo, TaskAction, TaskCard, TaskDetail, TodayBoard } from "./types";
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly body: unknown) {
@@ -38,6 +38,17 @@ export const api = {
   parse: (text: string) => req<Parsed>("POST", "/parse", { text }),
   search: (q: string) => req<{ tasks: TaskCard[]; notes: (NoteListItem & { snippet: string })[] }>("GET", `/search?q=${encodeURIComponent(q)}`),
   projects: () => req<Project[]>("GET", "/projects"),
+  prefs: () => req<Prefs>("GET", "/prefs"),
+  settings: () => req<SettingsPage>("GET", "/settings"),
+  saveSettings: (values: Record<string, string | null>) => req<SettingsPage & { restart: string[] }>("PUT", "/settings", { values }),
+  restart: () => req<{ restarting: boolean }>("POST", "/settings/restart"),
+  pause: (minutes: number) => req<{ pausedUntil: string | null }>("POST", "/reminders/pause", { minutes }),
+  system: () => req<SystemInfo>("GET", "/system"),
+  backupNow: () => req<{ name: string; bytes: number }>("POST", "/backup"),
+  deleteTask: (id: string) => req<{ title: string; removed: number; undo: string | null }>("DELETE", `/tasks/${encodeURIComponent(id)}`),
+  deleteProject: (slug: string, keepTasks: boolean) => req<{ title: string; tasksDeleted: number; tasksKept: number }>("DELETE", `/projects/${encodeURIComponent(slug)}?keepTasks=${keepTasks}`),
+  deleteNote: (id: string) => req<{ trash: string; undo: string }>("DELETE", `/notes/${encodeURIComponent(id)}`),
+  undo: (token: string) => req<{ kind: string; path: string }>("POST", "/undo", { token }),
   project: (slug: string) => req<ProjectDetail>("GET", `/projects/${encodeURIComponent(slug)}`),
   createProject: (name: string) => req<Project & { path: string; created: boolean }>("POST", "/projects", { name }),
   suggest: () => req<{ projects: { slug: string; title: string }[]; tags: string[] }>("GET", "/suggest"),

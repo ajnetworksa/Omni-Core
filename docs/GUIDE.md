@@ -35,8 +35,8 @@ Everything can also be typed:
 
 ### Reminder buttons
 
-`✅ Done` · `🌗 Partial` (25/50/75% / started) · `💬 Remark` (reply with the update) ·
-`⏱ +1h` · `🌅 Tomorrow` (moves the due date to `TOMORROW_TIME`, written to the file) · `🔕 Today`
+`✅ Done` · `🌗 Partly done` (25/50/75%, just started, or 🗑 Delete task) · `💬 Update` (your next message is saved on the task; no need to use Telegram's reply) ·
+`⏱ In 1 hour` · `🌅 Tomorrow` (moves the date to the "Tomorrow means" time, written to the file) · `🔕 Quiet today`
 
 ## Nag engine
 
@@ -86,27 +86,46 @@ inserts the next occurrence above it.
 - **Rollover:** at 23:59:59 local, open tasks due today or earlier move to tomorrow and get `rollover_cnt += 1`.
   The new date is written to the file, and a catch-up pass runs on startup.
 
-## Web app & Mini App
+## The app (web and Telegram Mini App)
 
-Screenshots: [`screenshots/ui/`](screenshots/ui/).
+Screenshots: [`screenshots/ui/`](screenshots/ui/) (`v6-*`).
 
-**Web app** (`/`), dark theme:
-- **Today**: what needs attention, what's later today, and what's done. The right rail shows the daily note, a quick log and the next nudge.
-- **Task drawer**: subtasks, remarks, nudge history, and the source line with *Open note* / *Open in Obsidian*.
-- **Upcoming**, **Inbox**, a drag-and-drop **Board**, **Notes** (folder tree, editor, backlinks) and **Graph**.
-- **⌘K** opens the command palette.
+It's **one app**: the same screens, words and colours on the web and in Telegram. On a computer you get a sidebar; on a phone and in Telegram, four tabs (Today · Upcoming · Projects · More). The screen's main action (New task, ✓ Done, Add to …) is Telegram's big bottom button in the Mini App and a button at the bottom on the web.
 
-The quick-add box understands `!p1`, `@tomorrow 10:00`, `#tag` and `#project/slug`, and previews them as chips.
+- **Today**: *Needs you now* (time has come, partly done or waiting), *Later today*, done, and a link to today's note.
+- **Upcoming**: the next two weeks, then tasks with no date (those never remind you).
+- **Projects**: open one to see and add its tasks, or delete it (keep or delete its tasks). New project creates `projects/<name>.md`.
+- **A task**: rename it, pick the day, time and priority, add steps (or let the AI suggest them), write updates, and see in one sentence what the reminders will do next. *Partly done*, *Later* (1 hour / tomorrow / quiet today), pin, delete.
+- **More**: Notes (edit, delete), Search (and Ask, with AI), Board (drag between *Someday · To do · Doing · Waiting · Done*), Map (web), Settings, Help & guide.
+- **Settings**: everything in [Settings](#settings) below.
+- First visit shows a three-step welcome; **Help & guide** has the full explanation, including what every word means.
 
-Editing a note from the UI checks the file's checksum first. If Obsidian changed the file in the meantime, the save is refused rather than overwriting it.
+**Words** (the files keep their own syntax): Someday = no plan yet, no reminders · To do · Doing = started or partly done · Waiting = stuck, you added an update · Done · *Update* = a note about what's happening (it was called "remark").
 
-**Telegram Mini App** (`/tg`) is a light, phone-first view: Today, Upcoming, Projects, task detail and add.
-- It follows your Telegram theme (light or dark) and uses Telegram's own main/back buttons and haptics.
+**Delete & undo**: deleting a task removes its line (and its steps) from the note; *Undo* puts it back exactly, for 15 minutes. A deleted note or project note goes to the vault's `.trash/` folder, which Obsidian shows too.
+
+The quick-add box understands `!p1`, `@tomorrow 10:00`, `#tag` and `#project/slug`, suggests them as you type and previews them as chips.
+
+Editing a note checks the file's checksum first. If Obsidian changed the file in the meantime, the save is refused rather than overwriting it.
+
+**Telegram Mini App** (`/tg`):
 - It signs in automatically with Telegram's signed `initData`. Only user ids in `TELEGRAM_ALLOWED_USER_IDS` are accepted.
+- Telegram's header and buttons are painted to match the app's theme.
+- To enable it: set `PUBLIC_URL=https://your-host` (or use the `quicktunnel` extra) and restart. The bot then sets its menu button to **Open**, and reminders get an **📱 Open in app** button.
 
-To enable it:
-1. Set `PUBLIC_URL=https://your-host` (Telegram requires https).
-2. Restart the server. The bot then sets its menu button to **Open**, and reminders get an **📱 Open in app** button.
+## Settings
+
+Settings → saved in the database and they **override `.env`**. *Reset* on a setting goes back to `.env` / the default.
+
+| Group | Settings |
+|---|---|
+| You & your time | Your name · Time zone · Week starts on · Weekend days · Clock (24h / 12h) |
+| Reminders | Pause all (1 hour / until tomorrow / a week) · Remind me at (tasks with only a date) · how often when not started / partly done / after an update · Quiet hours · "Tomorrow" means |
+| Daily summaries | Morning summary on/off + time · Evening review on/off + time |
+| Look | Theme (light / dark / automatic) · Accent colour · Open the app on |
+| App & updates | Version and the update command · Telegram / Mini App / AI status · Back up now |
+
+Reminder and time settings are read when the app starts, so they show *Waiting for a restart*; **Apply now** restarts the app (about 5 seconds in Docker). The rest apply immediately.
 
 Sessions:
 - Both use an HttpOnly signed cookie: 30 days for the web app, 12 h for the Mini App.

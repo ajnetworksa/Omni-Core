@@ -57,35 +57,15 @@ export const haptic = {
   err: () => window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred("error"),
 };
 
-/** Paper colours for Telegram's own chrome (header, background, main button), so it matches the page. */
-export const PAPER = {
-  light: { bg: "#f7f7f5", accent: "#2f6feb" },
-  dark: { bg: "#16171a", accent: "#5b8def" },
-};
-export type ThemePref = "light" | "dark" | "auto";
-export function readThemePref(): ThemePref {
-  try {
-    const v = localStorage.getItem("oc-tg-theme");
-    return v === "dark" || v === "auto" ? v : "light";
-  } catch {
-    return "light";
-  }
-}
-export function saveThemePref(v: ThemePref) {
-  try {
-    localStorage.setItem("oc-tg-theme", v);
-  } catch {
-    /* storage unavailable: the choice lasts for this session */
-  }
-}
-export function paintChrome(w: TgWebApp | null, dark: boolean) {
+/** Paint Telegram's own chrome (header, background, main button) in the page's Paper colours. */
+export function paintChrome(w: TgWebApp | null, dark: boolean, accent?: string) {
   if (!w) return;
-  const c = dark ? PAPER.dark : PAPER.light;
+  const bg = dark ? "#16171a" : "#f7f7f5";
   try {
-    w.setHeaderColor?.(c.bg);
-    w.setBackgroundColor?.(c.bg);
-    w.setBottomBarColor?.(c.bg);
-    w.MainButton.setParams?.({ color: c.accent, text_color: "#ffffff" });
+    w.setHeaderColor?.(bg);
+    w.setBackgroundColor?.(bg);
+    w.setBottomBarColor?.(bg);
+    w.MainButton.setParams?.({ color: accent || (dark ? "#5b8def" : "#2f6feb"), text_color: "#ffffff" });
   } catch {
     /* older Telegram clients: keep their colours */
   }

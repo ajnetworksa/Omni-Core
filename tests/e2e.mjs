@@ -292,7 +292,7 @@ await c.run("/todo creates the task and replies with 6 action buttons", async ()
   tgTask = await byTitle("Flash router firmware");
   assert(tgTask && tgTask.priority === 1, "task");
   const btns = m.payload.reply_markup.inline_keyboard.flat();
-  eq(btns.map((b) => b.text), ["✅ Done", "🌗 Partial", "💬 Remark", "⏱ +1h", "🌅 Tomorrow", "🔕 Today"]);
+  eq(btns.map((b) => b.text), ["✅ Done", "🌗 Partly done", "💬 Update", "⏱ In 1 hour", "🌅 Tomorrow", "🔕 Quiet today"]);
   assert(btns.every((b) => Buffer.byteLength(b.callback_data) <= 64), "callback_data > 64 bytes");
 });
 await c.run("'+ text' quick task", async () => {
@@ -353,7 +353,7 @@ await c.run("reminder buttons: Partial menu → 25%", async () => {
   const since = tg.mark();
   tg.inject(callbackUpdate(tg, ME, `t:menu:${tgTask.id}`, { message_id: 77, text: "r" }));
   const kb = await tg.waitFor("editMessageReplyMarkup", () => true, 8000, since);
-  eq(kb.payload.reply_markup.inline_keyboard.flat().map((b) => b.text), ["25%", "50%", "75%", "▶️ Just started", "⬅️ Back"]);
+  eq(kb.payload.reply_markup.inline_keyboard.flat().map((b) => b.text), ["25%", "50%", "75%", "▶️ Just started", "🗑 Delete task", "⬅️ Back"]);
   tg.inject(callbackUpdate(tg, ME, `t:p25:${tgTask.id}`, { message_id: 77, text: "r" }));
   await until(async () => (await byTitle("Flash router firmware")).progress === 25);
 });

@@ -180,6 +180,11 @@ export class VaultIndexer {
     return this.lock.run(rel, () => this.removeFileUnlocked(rel));
   }
 
+  /** For callers that already hold the file's lock. */
+  removeFileUnlockedPublic(rel: string): Promise<IndexResult> {
+    return this.removeFileUnlocked(rel);
+  }
+
   private async removeFileUnlocked(rel: string): Promise<IndexResult> {
     const n = this.db.select({ id: notes.id }).from(notes).where(eq(notes.path, rel)).get();
     if (!n) return "unchanged";

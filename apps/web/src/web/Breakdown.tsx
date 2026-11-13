@@ -43,8 +43,8 @@ export function Breakdown({ task, compact = false }: { task: TaskDetail; compact
   }
 
   return (
-    <section aria-label="Suggested subtasks" className="flex flex-col gap-2 rounded-xl border border-[#2e2a52] bg-[#14132a] p-3.5">
-      <div className="flex items-center gap-1.5 text-[13px] text-[#c4b5fd]">
+    <section aria-label="Suggested subtasks" className="flex flex-col gap-2 rounded-xl border border-line bg-[var(--tg-accent-soft)] p-3.5">
+      <div className="flex items-center gap-1.5 text-[13px] text-accent-soft">
         <Sparkles size={14} aria-hidden /> Suggested subtasks <span className="text-faint">— edit or untick before adding</span>
       </div>
       {items.map((it, i) => (
@@ -54,7 +54,7 @@ export function Breakdown({ task, compact = false }: { task: TaskDetail; compact
             checked={it.on}
             aria-label={`Include “${it.text}”`}
             onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))}
-            className="h-4 w-4 accent-[#8b7cf6]"
+            className="h-4 w-4 accent-[var(--tg-accent)]"
           />
           <input
             value={it.text}

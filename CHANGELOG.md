@@ -3,6 +3,53 @@
 All notable changes. Versions follow [semver](https://semver.org/); the release workflow uses the
 section for a tag as the GitHub Release notes.
 
+## [0.6.0] — 2026-11-13 · One app, settings, delete, plain words
+
+**In short:** the web app and the Telegram Mini App are now the same app, in one calm "Paper" design, with everyday words and explanations built in. You can change reminders, quiet hours, summaries, time zone and the look from a **Settings** page instead of `.env`, delete things with **Undo**, and the Telegram bot works with buttons instead of commands. Deploying is now `cp .env.example .env` → `docker compose up -d`.
+
+This release also includes everything from 0.5.1–0.5.3 (listed below), so it's the one to install if you're on 0.5.0.
+
+### Highlights
+- **One app, one look.** Same screens and words on the web and in Telegram: a sidebar on a computer, tabs (Today · Upcoming · Projects · More) on a phone and in Telegram. Light by default, a matching dark theme, four accent colours.
+- **Settings page.**
+  - You & your time: name, time zone, week start, weekend days, clock.
+  - Reminders: **pause all** (1 hour / until tomorrow / a week), default time, how often (not started / partly done / after an update), quiet hours, what "Tomorrow" means.
+  - Daily summaries: morning and evening on/off and times.
+  - Look: theme, accent, start screen.
+  - App & updates: version and the update command, Telegram/Mini App/AI status, **Back up now**.
+  - Saved in the database, overriding `.env`. Settings read at start-up show "waiting for a restart"; **Apply now** restarts the app (≈5 s in Docker).
+- **Delete with Undo**: tasks (with their steps), projects (keep or delete their tasks) and notes (moved to the vault's `.trash/`, never erased). In Telegram too: 🌗 Partly done → 🗑 Delete task → confirm → ↩️ Undo.
+- **Plain words**: Someday · To do · Doing · Waiting · Done, *Update* (was "remark"), *Partly done*, *Later*, *Needs you now*. Each task says in one sentence what its reminders will do next; (?) buttons explain things in place.
+- **Welcome guide** on first visit and a **Help & guide** page: how it works, what the words mean, where things are, and how reminders work, with your own settings.
+- **One task screen** for web and Telegram: rename; date, time and priority; steps (or AI break-down); updates; reminder history; the file it lives in.
+- **Telegram is button-driven** (0.5.2): a keyboard under the message box (📋 Today · ➕ New task · 📁 Projects · ☰ Menu); a new-task card where you tap date, time, priority and project; create and open projects from Telegram. Buttons renamed to 🌗 Partly done · 💬 Update · ⏱ In 1 hour · 🌅 Tomorrow · 🔕 Quiet today.
+- **New task suggests as you type** (0.5.3): `@` dates, `!` priority, `#` projects and tags, numbers → times, `every` → repeats, plus one-tap chips.
+
+### Fixed
+- **Updates (remarks) in Telegram** were only saved if you used Telegram's swipe-to-reply; now the next message after 💬 Update is saved. In the app, updates have a visible Save button.
+- An invalid `PUBLIC_URL` (e.g. missing `https://`) stopped the app; it's now fixed up or ignored with a warning (0.5.2).
+- Building from a working copy could skip compiling (`*.tsbuildinfo` now in `.dockerignore`); `update.sh` treats a closed prompt as "no" (0.5.1).
+
+### Deploying & upgrading
+- **New install:** `git clone …` → `cp .env.example .env` → fill in what you want → `docker compose up -d` → `cat data/api-token` for the web password (0.5.1).
+- **Extras from `.env`:** `COMPOSE_PROFILES=ai,tunnel` (also `quicktunnel`, `redis`). The app finds the bundled Ollama/Redis itself, downloads missing AI models, creates its folders with the right owner, and makes a password if `API_TOKEN` is empty.
+- **`quicktunnel`** (0.5.2): an instant `https://….trycloudflare.com` address for the Mini App, no Cloudflare account; the bot sends you the link. `LISTEN=0.0.0.0` opens the web app to your home network.
+- **From 0.5.0:** `scripts/update.sh` (or `git pull && docker compose up -d --build`). The database migration (`0004_settings`) runs by itself. Your `.env` keeps working; `.env.example` is now much shorter, and every setting is listed in `docs/CONFIGURATION.md`. Settings you change in the app override `.env`.
+
+### For developers
+- Web: `apps/web/src/app/` holds the shared screens; `usePrimary` / `useBack` map to Telegram's native buttons in the Mini App. The old separate web/Mini App screens are gone. UI rules are in `AGENTS.md`.
+- API:
+  - `GET /api/prefs`
+  - `GET/PUT /api/settings`, `POST /api/settings/restart`
+  - `POST /api/reminders/pause`
+  - `GET /api/system`
+  - `POST /api/backup`
+  - `DELETE /api/tasks/:id`, `DELETE /api/projects/:slug?keepTasks=`, `DELETE /api/notes/:id`
+  - `POST /api/undo`
+  - `GET/POST /api/projects/:slug` / `/api/projects`
+  - `GET /api/suggest`
+- Tests: core 98 · server 71 · E2E 56 · security 26 · AI 25, plus the browser walkthrough `demo/peek-app.mjs` (23 checks, web + Mini App). Details in `TESTING.md`.
+
 ## [0.5.3] — 2026-11-12 · Mini App: Paper look, suggestions, projects
 
 - **Matches mockup B (Paper)**: its own palette instead of Telegram's theme colours. Light by default, with a matching "Paper night"; the ☀️ button cycles light → night → follow Telegram, and the choice is remembered. Telegram's header, background and main button are painted to match.
