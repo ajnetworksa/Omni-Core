@@ -1,7 +1,17 @@
 # AGENTS.md — working on OmniCore
 
-Read this first. It's written for any AI coding assistant (Claude, Codex, Cursor, Gemini…) or a
-new developer picking the project up. Keep it current when you change how things work.
+Read this first. It's written for any AI coding assistant (Claude, Codex, Cursor, Gemini /
+Antigravity…) or a new developer picking the project up. Keep it current when you change how things work.
+
+## Start here (every session)
+
+1. Read this file, then **[docs/HANDOFF.md](docs/HANDOFF.md)** (current state, what's verified, what isn't, what's next).
+2. Run **`npm run verify:quick`** before changing anything. If it fails, report that first.
+3. Make one small change at a time; `npm run verify:quick` after each.
+4. Before you say "done": **`npm run verify`** (add `-- --browser` for UI, `-- --docker` for Docker/deps) and paste the table from `tests/.run/verify/REPORT.md`. **No claim of "works" without that output.** If something couldn't be run, write "NOT VERIFIED: …".
+5. End of session: update `docs/HANDOFF.md` (and CHANGELOG / PROGRESS when relevant).
+
+The always-on rules (`.agents/rules/`) and step-by-step workflows (`.agents/workflows/`: verify, feature, fix, release, deploy, handoff) apply to every assistant, not only Antigravity.
 
 ## What this is
 
@@ -46,7 +56,9 @@ apps/web/               React 19 + Vite + Tailwind 4: ONE app, served at / (web)
   src/tg/               Telegram glue only (SDK, MiniApp entry, quick-add suggestions)
   src/settings.ts (server) settings registry: labels/help shown in the UI; stored in the `settings` table
 tests/                  end-to-end suites (real server + mock Telegram/AI); lib/ has the mocks
-scripts/                update.sh, install.sh (optional first-start shortcut), config-docs.mjs
+scripts/                verify.mjs (the proof), update.sh, install.sh (optional), config-docs.mjs, setup-hooks.mjs
+.githooks/              pre-push → verify:quick (installed by `npm ci`)
+.agents/                rules/ (always-on rules) and workflows/ (/verify /feature /fix /release /deploy /handoff)
 demo/                   screenshot/demo scripts (Playwright); not part of the product
 docs/                   everything above + screenshots/
 ```
@@ -63,6 +75,9 @@ npm run test:e2e            # 56 feature checks, live server + mock Telegram (~2
 npm run test:security       # 26 security checks (~1 min)
 npm run test:ai             # 25 AI checks, live server + mock model server (~2 min)
 npm run test:all            # everything above
+npm run verify              # build + ALL suites + hygiene → tests/.run/verify/REPORT.md (PASS/FAIL table)
+npm run verify:quick        # build + unit tests (~1 min); also runs on every `git push` (.githooks/pre-push)
+npm run verify:full         # + browser walkthrough (Playwright) + Docker image check
 node scripts/config-docs.mjs   # regenerate docs/CONFIGURATION.md after changing config.ts
 ```
 
@@ -94,8 +109,9 @@ editing core before `npm test -w @omnicore/server`.
 
 ## Definition of done
 
-- `npm run build` is clean (strict TypeScript, no `any` escapes without a reason).
-- `npm run test:all` passes, and a new feature has a unit test and a line in an E2E suite.
+- `npm run verify` prints **VERIFY: PASS** (with `--browser` for UI work), and the table is in your summary.
+- A new feature has a unit test and a check in an end-to-end suite; a bug fix has a test that failed before the fix.
+- Nothing you weren't asked to change was changed (no drive-by refactors, renames or dependency upgrades).
 - UI changes: take screenshots (`demo/` scripts) and look at them; no console errors.
 - Update `docs/PROGRESS.md`, `CHANGELOG.md` (if user-visible), `docs/DECISIONS.md` (if non-obvious), and `README.md`/`docs/GUIDE.md` (if usage changed).
 - Releases: bump `version` in the root `package.json`, add the CHANGELOG section, tag `vX.Y.Z`, push. GitHub Actions builds the image; servers run `scripts/update.sh`.

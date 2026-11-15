@@ -3,6 +3,15 @@
 All notable changes. Versions follow [semver](https://semver.org/); the release workflow uses the
 section for a tag as the GitHub Release notes.
 
+## [Unreleased]
+
+- For contributors and AI assistants:
+  - `npm run verify` builds, runs every suite and checks the repo for stray files, then writes a PASS/FAIL report. `--browser` adds the click-through walkthrough; `--docker` builds the image and checks it starts.
+  - `git push` runs `verify:quick` first (`.githooks/pre-push`, installed by `npm ci`).
+  - Antigravity/Gemini rules (`GEMINI.md`, `.agents/rules/`) and workflows (`.agents/workflows/`).
+  - `docs/HANDOFF.md`: the current state, what's verified, what's next.
+- `*.zip` is ignored by git.
+
 ## [0.6.0] — 2026-11-13 · One app, settings, delete, plain words
 
 **In short:** the web app and the Telegram Mini App are now the same app, in one calm "Paper" design, with everyday words and explanations built in. You can change reminders, quiet hours, summaries, time zone and the look from a **Settings** page instead of `.env`, delete things with **Undo**, and the Telegram bot works with buttons instead of commands. Deploying is now `cp .env.example .env` → `docker compose up -d`.

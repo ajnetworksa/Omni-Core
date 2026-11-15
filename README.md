@@ -68,10 +68,13 @@ npm ci                     # Node 22.16+ (24 recommended); no native modules
 cp .env.example .env       # API_TOKEN at least
 npm run build && npm start # http://127.0.0.1:3000
 npm run dev:web            # UI hot reload on :5173
-npm run test:all           # unit + E2E + security + AI suites (~6 min); mocks stand in for Telegram and Ollama
+npm run verify             # build + every test suite → PASS/FAIL table in tests/.run/verify/REPORT.md (~4 min)
+npm run verify:quick       # build + unit tests (~1 min); runs automatically on `git push`
 ```
 
-Working with an AI assistant? Point it at **[AGENTS.md](AGENTS.md)** first.
+Mocks stand in for Telegram and Ollama, so no real services are needed for any test.
+
+Working with an AI assistant (Claude, Antigravity/Gemini, Cursor…)? It should read **[AGENTS.md](AGENTS.md)** and **[docs/HANDOFF.md](docs/HANDOFF.md)** first. The rules in `.agents/rules/` require it to run `npm run verify` and show the result before calling anything done.
 
 ## Docs
 

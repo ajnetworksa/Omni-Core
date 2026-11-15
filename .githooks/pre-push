@@ -1,0 +1,9 @@
+#!/bin/sh
+# Blocks a push that doesn't build or fails the unit tests (about a minute).
+# Skip in an emergency with: git push --no-verify   (then run `npm run verify` as soon as you can)
+echo "pre-push: npm run verify:quick (build + unit tests)…"
+if ! npm run --silent verify:quick; then
+  echo ""
+  echo "pre-push: FAILED — not pushing. Fix it, or see tests/.run/verify/REPORT.md"
+  exit 1
+fi

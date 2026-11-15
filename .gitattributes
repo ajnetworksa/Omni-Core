@@ -6,3 +6,4 @@ Dockerfile text eol=lf
 *.yml text eol=lf
 *.png binary
 *.db binary
+.githooks/* text eol=lf

@@ -19,7 +19,11 @@
     "test:ai": "npm run build && node --disable-warning=ExperimentalWarning tests/ai-e2e.mjs",
     "backup": "node apps/server/dist/backup.js",
     "update": "bash scripts/update.sh",
-    "test:all": "npm run build && npm test && node --disable-warning=ExperimentalWarning tests/e2e.mjs && node --disable-warning=ExperimentalWarning tests/security.mjs && node --disable-warning=ExperimentalWarning tests/ai-e2e.mjs"
+    "test:all": "npm run build && npm test && node --disable-warning=ExperimentalWarning tests/e2e.mjs && node --disable-warning=ExperimentalWarning tests/security.mjs && node --disable-warning=ExperimentalWarning tests/ai-e2e.mjs",
+    "verify": "node scripts/verify.mjs",
+    "verify:quick": "node scripts/verify.mjs --quick",
+    "verify:full": "node scripts/verify.mjs --browser --docker",
+    "prepare": "node -e \"import('./scripts/setup-hooks.mjs').catch(()=>{})\""
   },
   "engines": {
     "node": ">=22.16"

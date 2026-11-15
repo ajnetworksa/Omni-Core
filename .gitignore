@@ -15,3 +15,6 @@ demo/shots/
 demo/ui-run/
 *.tsbuildinfo
 .DS_Store
+
+# archives (e.g. a zipped copy of the project)
+*.zip

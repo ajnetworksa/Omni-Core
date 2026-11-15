@@ -2,14 +2,21 @@
 // every screen and checking delete + undo, updates, steps, settings and the guide.
 //   node demo/ui-session.mjs   (wait for READY)   then   node demo/peek-app.mjs /tmp/shots
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { signInitData } from "../apps/server/dist/auth.js";
 import { telegramStub } from "./tg-stub.mjs";
-const require = createRequire("/opt/npm-tools/node_modules/");
-const { chromium } = require("playwright");
+// Playwright from the project (npm i -D playwright), or a global install.
+let chromium;
+try {
+  ({ chromium } = await import("playwright"));
+} catch {
+  ({ chromium } = createRequire("/opt/npm-tools/node_modules/")("playwright"));
+}
 const { base, token, bot } = JSON.parse(readFileSync(new URL("./ui-run/ready", import.meta.url)));
 const out = process.argv[2] ?? "/tmp";
-const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+// CHROME_PATH (or /usr/bin/google-chrome if present); otherwise Playwright's own Chromium.
+const exe = process.env.CHROME_PATH || (existsSync("/usr/bin/google-chrome") ? "/usr/bin/google-chrome" : undefined);
+const b = await chromium.launch({ executablePath: exe, args: ["--no-sandbox"] });
 const problems = [];
 let ok = 0;
 const check = (name, cond) => { if (cond) ok++; else problems.push(name); console.log(`${cond ? "✔" : "✘"} ${name}`); };
