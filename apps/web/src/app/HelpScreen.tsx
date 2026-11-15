@@ -8,7 +8,7 @@ import { Button, Card, hint, PageTitle, Sheet } from "./ui";
 import { howRemindersWork, STATUS } from "./words";
 
 const STEPS: [string, string, string][] = [
-  ["✍️", "Add what needs doing", "Tap New task (or send “+ Buy cables tomorrow 18:00” to the Telegram bot). Pick a day and time if you want reminders."],
+  ["✍️", "Add what needs doing", "Tap New task (or send “+ Buy cables tomorrow 18:00” to the Telegram bot). Pick a day and time if you want reminders. Several at once: type “1. … 2. … 3. …” or one per line, and each becomes its own task."],
   ["🔔", "Get reminded until it's done", "When the time comes I message you on Telegram, and keep reminding you until you act. One tap on a button answers."],
   ["🌗", "Say how it's going", "Partly done, or an update like “waiting for parts”, and I check back later instead of nagging. Later moves the reminder."],
   ["🌙", "Nothing gets lost", "Anything not done by midnight moves to tomorrow and shows how many times it moved."],

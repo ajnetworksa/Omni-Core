@@ -5,6 +5,8 @@ section for a tag as the GitHub Release notes.
 
 ## [Unreleased]
 
+- **Lists become separate tasks.** Type or paste `1. Buy milk 2. Call ISP`, `1 milk 2 eggs`, `1.milk 2.eggs`, a bulleted list, or one task per line, and each item is its own task instead of one long task. Each keeps its own `@date`, `!priority` and `#tags`. Works in the web app and Mini App (a preview shows "Adds 3 separate tasks" before saving; Undo removes all of them), with `+ …` and `/todo …` in Telegram, and in the ➕ New task card (its date, time, priority and project fill in what an item didn't say). A `…:` header line is dropped. Numbers must run 1, 2, 3, so "Buy 2 apples" or "1 hour meeting" stay one task. API: `POST /api/tasks/many`; `/api/parse` returns `items`.
+- **Update button in Settings → App & updates.** **Check for updates** and **Update now** (asks first), with progress, the result and "Show details" (the update log). It runs `scripts/update.sh` for you (backup first, health check, automatic rollback) through a small optional helper container: add `updater` to `COMPOSE_PROFILES` in `.env`, then `docker compose up -d` once. Without it, Settings shows the command as before and says how to turn the button on. The helper uses the Docker socket (so it controls Docker on that machine) and your home folder read-only (for git's SSH key or credentials); it works as the checkout's owner so `git pull` keeps working for you.
 - For contributors and AI assistants:
   - `npm run verify` builds, runs every suite and checks the repo for stray files, then writes a PASS/FAIL report. `--browser` adds the click-through walkthrough; `--docker` builds the image and checks it starts.
   - `git push` runs `verify:quick` first (`.githooks/pre-push`, installed by `npm ci`).

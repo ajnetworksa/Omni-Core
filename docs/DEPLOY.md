@@ -91,6 +91,16 @@ Existing Obsidian vault? Change `./vault:/vault` in `docker-compose.yml` to its 
 
 ## 3. Update
 
+**With a button:** add `updater` to `COMPOSE_PROFILES` in `.env` (e.g. `COMPOSE_PROFILES=quicktunnel,updater`) and run `docker compose up -d` once. Then use **Settings → App & updates → Check for updates / Update now**. The button runs the same `scripts/update.sh --yes` shown below, through a small helper container (`docker/updater/`):
+- it gets the Docker socket, so it can rebuild and restart the app (that means it controls Docker on this machine);
+- it mounts your home folder read-only so `git fetch` can use your SSH key or saved credentials for the private repo (another home: `UPDATER_HOME=/home/you` in `.env`);
+- it runs as the owner of the checkout, so the files stay yours;
+- it does nothing until you tap a button. The app and the helper talk through `data/.update/` (`request.json`, `status.json`, `last.log`).
+
+If the button says the fetch failed, run `git fetch` on the server as the same user once; the helper can't answer password prompts or add new SSH host keys.
+
+**From the command line:**
+
 ```bash
 cd /opt/omnicore
 scripts/update.sh --check     # anything new? (exit code 10 = yes)

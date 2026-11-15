@@ -60,7 +60,7 @@ export interface NoteDetail extends NoteListItem {
   outgoing: { title: string; heading: string | null; targetId: string | null }[];
   tasks: TaskCard[];
 }
-export interface Parsed { title: string; priority: number | null; dueDate: string | null; dueTime: string | null; recurrence: string | null; project: string | null; tags: string[] }
+export interface Parsed { title: string; priority: number | null; dueDate: string | null; dueTime: string | null; recurrence: string | null; project: string | null; tags: string[]; items?: string[] | null }
 export interface GraphData { nodes: { id: string; title: string; path: string; orphan: boolean }[]; edges: { source: string; target: string }[]; dangling: { source: string; targetTitle: string }[] }
 
 export interface AiStatus {
@@ -117,4 +117,15 @@ export interface SystemInfo {
   counts: { tasks: number; done: number; notes: number; projects: number };
   backups: { name: string; bytes: number; at: string }[];
   docker: boolean;
+  updater: UpdaterStatus;
+}
+export interface UpdaterStatus {
+  available: boolean;
+  busy: boolean;
+  state: "idle" | "queued" | "running" | "uptodate" | "available" | "updated" | "failed";
+  kind: "check" | "update" | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  error: string | null;
+  log: string[];
 }

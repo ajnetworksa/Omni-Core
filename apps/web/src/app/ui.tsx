@@ -212,14 +212,14 @@ export function Button({ children, onClick, tone = "plain", disabled, className 
 }
 
 /** "Are you sure?" for anything destructive. */
-export function Confirm({ title, text, confirm, onConfirm, onClose, children }: { title: string; text: ReactNode; confirm: string; onConfirm: () => void; onClose: () => void; children?: ReactNode }) {
+export function Confirm({ title, text, confirm, onConfirm, onClose, children, tone = "danger" }: { title: string; text: ReactNode; confirm: string; onConfirm: () => void; onClose: () => void; children?: ReactNode; tone?: "danger" | "accent" }) {
   return (
     <Sheet title={title} onClose={onClose}>
       <div className="text-[15px] leading-snug" style={{ color: "var(--tg-fg-2)" }}>{text}</div>
       {children}
       <div className="flex gap-2 pt-1">
         <Button onClick={onClose} tone={confirm ? "plain" : "ghost"} className="flex-1">Cancel</Button>
-        {confirm && <Button tone="danger" onClick={onConfirm} className="flex-1">{confirm}</Button>}
+        {confirm && <Button tone={tone} onClick={onConfirm} className="flex-1">{confirm}</Button>}
       </div>
     </Sheet>
   );

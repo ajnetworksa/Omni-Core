@@ -143,6 +143,15 @@ await c.run("quick-add lands in today's daily note with project + metadata", asy
   const homelab = (await api.get("/api/projects")).json.find((p) => p.slug === "homelab");
   eq(r.json.projectId, homelab.id);
 });
+await c.run("POST /api/tasks/many: a list becomes one task per item; preview lists them", async () => {
+  const p = await api.post("/api/parse", { text: "1. Patch NAS 2. Rotate backups @tomorrow" });
+  eq(p.json.items, ["Patch NAS", "Rotate backups"]);
+  const r = await api.post("/api/tasks/many", { text: "1. Patch NAS 2. Rotate backups @tomorrow", projectSlug: "homelab" });
+  eq(r.status, 201);
+  eq(r.json.tasks.map((t) => [t.title, t.dueDate]), [["Patch NAS", null], ["Rotate backups", plus1]]);
+  const single = await api.post("/api/tasks/many", { text: "Order 2 SFP modules" });
+  eq(single.json.tasks.map((t) => t.title), ["Order 2 SFP modules"]);
+});
 await c.run("done flips only the checkbox and adds ✅; reopening restores the file byte-for-byte", async () => {
   const t = await byTitle("Renew TLS certs");
   const before = read("projects/homelab.md");
@@ -299,6 +308,36 @@ await c.run("'+ text' quick task", async () => {
   say("+ Label patch panel @tomorrow");
   const t = await until(() => byTitle("Label patch panel"));
   eq(t.dueDate, plus1);
+});
+await c.run("a typed list becomes separate tasks ('+', /todo, ➕ New task card)", async () => {
+  let since = tg.mark();
+  say("+ 1. Order cage nuts 2. Label uplinks @tomorrow");
+  let m = await lastReplyTo(since);
+  assert(m.payload.text.includes("Added 2 tasks"), `reply: ${m.payload.text}`);
+  eq((await until(() => byTitle("Order cage nuts"))).dueDate, null);
+  eq((await byTitle("Label uplinks")).dueDate, plus1);
+
+  since = tg.mark();
+  say("/todo Rack day:\n- Mount PDU\n- Test failover !p1");
+  m = await lastReplyTo(since);
+  assert(m.payload.text.includes("Added 2 tasks"), `reply: ${m.payload.text}`);
+  eq((await until(() => byTitle("Test failover"))).priority, 1);
+  assert(await byTitle("Mount PDU"), "Mount PDU");
+  assert(!(await byTitle("Rack day:")), "header line became a task");
+
+  since = tg.mark();
+  say("➕ New task");
+  await lastReplyTo(since);
+  since = tg.mark();
+  say("1.Clean dust filters 2.Check UPS log");
+  const card = await lastReplyTo(since);
+  assert(card.payload.text.includes("2 new tasks") && card.payload.text.includes("2. Check UPS log"), `card: ${card.payload.text}`);
+  const ok = card.payload.reply_markup.inline_keyboard.flat().find((b) => b.text.includes("Save"));
+  since = tg.mark();
+  tg.inject(callbackUpdate(tg, ME, ok.callback_data, { message_id: card.result.message_id, text: card.payload.text }));
+  await tg.waitFor("editMessageText", (x) => x.payload.text.includes("Added 2 tasks"), 8000, since);
+  eq((await until(() => byTitle("Check UPS log"))).dueDate, today);
+  eq((await byTitle("Clean dust filters")).dueDate, today);
 });
 await c.run("plain text → timestamped daily log line + ✍ reaction", async () => {
   const since = tg.mark();

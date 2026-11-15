@@ -96,6 +96,13 @@ export function formatTaskCreated(t: Task): string {
   return lines.join("\n");
 }
 
+/** Reply for a list that became several tasks. */
+export function formatTasksCreated(list: Task[]): { text: string; keyboard: InlineKeyboard } {
+  const lines = [`✅ <b>Added ${list.length} tasks</b>`];
+  list.forEach((t, i) => lines.push(`${i + 1}. ${esc(t.title)}${t.dueDate ? `  <i>📅 ${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ""}</i>` : ""}`));
+  return { text: lines.join("\n"), keyboard: new InlineKeyboard().text("📋 Today", "m:today").text("☰ Menu", "m:menu") };
+}
+
 type TodayView = ReturnType<typeof todayView>;
 
 export function formatToday(v: TodayView): { text: string; keyboard: InlineKeyboard } {
@@ -159,6 +166,7 @@ Everything here also works through the buttons (☰ Menu).
 • <b>Priority:</b> !p1 (urgent) to !p4
 • <b>Project:</b> #project/name · <b>Repeat:</b> 🔁 every week
 <code>/todo …</code> does the same as <code>+ …</code>
+• <b>Several at once:</b> <code>+ 1. Buy cables 2. Call ISP @tomorrow</code>, or one task per line. Each becomes its own task.
 
 <b>Capture</b>
 • Any other message goes into today's log.

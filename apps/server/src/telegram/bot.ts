@@ -18,11 +18,12 @@ import {
   todayInTz,
   todayView,
   type TaskAction,
+  type Task,
 } from "@omnicore/core";
 import { eq, like, or, sql } from "drizzle-orm";
 import { Bot, GrammyError, type BotConfig, type Context } from "grammy";
 import type { AppContext } from "../context.js";
-import { esc, formatExtracted, formatProject, formatTaskCreated, formatToday, getMiniAppUrl, HELP, partialKeyboard, reminderKeyboard } from "./format.js";
+import { esc, formatExtracted, formatProject, formatTaskCreated, formatTasksCreated, formatToday, getMiniAppUrl, HELP, partialKeyboard, reminderKeyboard } from "./format.js";
 import { InlineKeyboard } from "grammy";
 import { randomBytes } from "node:crypto";
 import { runDigest } from "../ai.js";
@@ -81,11 +82,17 @@ export function createBot(app: AppContext, botConfig?: BotConfig<Context>): Bot 
   bot.command("new", (ctx) => menus.newTask(ctx));
   bot.command("help", (ctx) => html(ctx, HELP, { reply_markup: new InlineKeyboard().text("☰ Menu", "m:menu") }));
 
+  /** One task: its card with reminder buttons. A list ("1. a 2. b", one per line): a numbered summary. */
+  const replyCreated = async (ctx: Context, list: Task[]) => {
+    if (list.length === 1) return html(ctx, formatTaskCreated(list[0]!), { reply_markup: reminderKeyboard(list[0]!.id) });
+    const { text, keyboard } = formatTasksCreated(list);
+    return html(ctx, text, { reply_markup: keyboard });
+  };
+
   bot.command("todo", async (ctx) => {
     const text = ctx.match.trim();
     if (!text) return html(ctx, "Usage: <code>/todo Title !p1 @today 18:00 #project/homelab</code>");
-    const t = await app.tasks.create({ text });
-    await html(ctx, formatTaskCreated(t), { reply_markup: reminderKeyboard(t.id) });
+    await replyCreated(ctx, await app.tasks.createMany({ text }));
   });
 
   bot.command("log", async (ctx) => {
@@ -364,8 +371,7 @@ export function createBot(app: AppContext, botConfig?: BotConfig<Context>): Bot 
     const text = ctx.message.text;
     if (await menus.handleText(ctx)) return;
     if (/^\+\s*\S/.test(text)) {
-      const t = await app.tasks.create({ text: text.replace(/^\+\s*/, "") });
-      return html(ctx, formatTaskCreated(t), { reply_markup: reminderKeyboard(t.id) });
+      return replyCreated(ctx, await app.tasks.createMany({ text: text.replace(/^\+\s*/, "") }));
     }
     if (text.startsWith("/")) return html(ctx, "Unknown command. Tap ☰ Menu or send /help.");
     await app.tasks.appendLog(text);

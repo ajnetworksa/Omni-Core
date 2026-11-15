@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Database, RefreshCw, Settings as SettingsIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { api, ApiError, refreshAll } from "../lib/api";
 import type { SettingItem, SettingsPage } from "../lib/types";
 import { haptic } from "../tg/telegram";
 import { useBack, useTo } from "./platform";
-import { Button, Card, Explain, hint, PageTitle, useToast } from "./ui";
+import { Button, Card, Confirm, Explain, hint, PageTitle, useToast } from "./ui";
 import { howRemindersWork } from "./words";
 
 const DAYS: [string, string][] = [["sat", "Sat"], ["sun", "Sun"], ["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"], ["fri", "Fri"]];
@@ -253,11 +253,33 @@ function PauseCard({ pausedUntil }: { pausedUntil: string | null }) {
 }
 
 function SystemSection() {
-  const sys = useQuery({ queryKey: ["system"], queryFn: api.system });
+  const [busyPoll, setBusyPoll] = useState(false);
+  const sys = useQuery({ queryKey: ["system"], queryFn: api.system, refetchInterval: busyPoll ? 2000 : false, retry: busyPoll ? true : 3, retryDelay: 2000 });
   const qc = useQueryClient();
   const toast = useToast();
+  const [confirmUpdate, setConfirmUpdate] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const s = sys.data;
-  if (!s) return null;
+  const up = s?.updater;
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (!s || !up) return;
+    setBusyPoll(up.busy);
+    if (up.busy) {
+      wasBusy.current = true;
+      return;
+    }
+    if (!wasBusy.current) return;
+    wasBusy.current = false;
+    if (up.state === "updated") {
+      toast.show({ text: `Updated to version ${s.version.version}. Reloading…` });
+      // New code means new screens: load them.
+      setTimeout(() => location.reload(), 1500);
+    } else if (up.state === "uptodate") toast.show({ text: "You're on the latest version" });
+    else if (up.state === "available") toast.show({ text: "A newer version is available" });
+    else if (up.state === "failed") toast.show({ text: up.kind === "update" ? "Update didn't work, nothing changed" : "Couldn't check for updates" });
+  }, [s, up, toast]);
+  if (!s || !up) return null;
   const v = s.version;
   const update = v.updateAvailable && v.latest ? v.latest : null;
   const cmd = "cd ~/app && scripts/update.sh";
@@ -269,6 +291,29 @@ function SystemSection() {
       toast.show({ text: cmd });
     }
   };
+  const ask = async (kind: "check" | "update") => {
+    setConfirmUpdate(false);
+    try {
+      await api.requestUpdate(kind);
+      haptic.tap();
+      wasBusy.current = true;
+      setBusyPoll(true);
+      await qc.invalidateQueries({ queryKey: ["system"] });
+    } catch (e) {
+      haptic.err();
+      const msg = e instanceof ApiError ? (e.body as { message?: string } | null)?.message : null;
+      toast.show({ text: msg ?? "Couldn't reach the update helper" });
+    }
+  };
+  const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+  const restarting = up.busy && up.kind === "update" && sys.isError;
+  const stateLine: [string, string] | null = up.busy
+    ? [up.kind === "update" ? (restarting ? "Restarting the app… this page reconnects by itself." : "Updating… backing up, downloading and rebuilding. This takes a few minutes; the app restarts by itself.") : "Checking for updates…", "var(--tg-link)"]
+    : up.state === "uptodate" ? [`You're on the latest version.${up.finishedAt ? ` Checked ${when(up.finishedAt)}.` : ""}`, "var(--tg-ok)"]
+    : up.state === "available" ? ["A newer version is available. Tap Update now.", "var(--tg-warn)"]
+    : up.state === "updated" ? [`Updated ${when(up.finishedAt)}.`, "var(--tg-ok)"]
+    : up.state === "failed" ? [`${up.kind === "update" ? "The last update didn't work. The app was put back as it was, and your data is untouched." : "Couldn't check for updates."}${up.error ? ` (${up.error})` : ""}`, "var(--tg-danger)"]
+    : null;
   const dot = (ok: boolean) => <span className="inline-block h-2 w-2 rounded-full" style={{ background: ok ? "var(--tg-ok)" : "var(--tg-check)" }} aria-hidden />;
   return (
     <section aria-label="System" className="flex flex-col gap-2 px-4">
@@ -276,17 +321,37 @@ function SystemSection() {
       <Card>
         <div className="flex flex-col gap-2 px-4 py-3.5">
           <span className="text-[15.5px] font-semibold">Version {v.version}{v.sha ? <span className="font-normal" style={hint}>{` · ${v.sha.slice(0, 7)}`}</span> : null}</span>
-          {update ? (
+          {update && <span className="text-[14px]" style={{ color: "var(--tg-warn)" }}>Version {update.version} is available.</span>}
+          {up.available ? (
             <>
-              <span className="text-[14px]" style={{ color: "var(--tg-warn)" }}>Version {update.version} is available.</span>
-              <span className="text-[13.5px]" style={hint}>To update, run this on your server. It backs up first and rolls back by itself if something goes wrong:</span>
+              {stateLine && <span role="status" className="text-[13.5px] leading-snug" style={{ color: stateLine[1] }}>{up.busy && <RefreshCw size={13} className="mr-1 inline animate-spin" aria-hidden />}{stateLine[0]}</span>}
+              <span className="text-[13.5px] leading-snug" style={hint}>Updating backs up your data first and puts everything back by itself if the new version doesn't start.</span>
+              <div className="flex gap-2">
+                <Button className="flex-1" disabled={up.busy} onClick={() => void ask("check")}>Check for updates</Button>
+                <Button className="flex-1" tone="accent" disabled={up.busy} onClick={() => setConfirmUpdate(true)}>Update now</Button>
+              </div>
+              {up.log.length > 0 && (
+                <button type="button" className="self-start text-[13px] font-medium" style={{ color: "var(--tg-link)" }} onClick={() => setShowLog((x) => !x)} aria-expanded={showLog}>
+                  {showLog ? "Hide details" : "Show details"}
+                </button>
+              )}
+              {showLog && up.log.length > 0 && (
+                <pre className="m-0 max-h-56 overflow-auto whitespace-pre-wrap rounded-[10px] px-3 py-2 font-mono text-[11.5px] leading-snug" style={{ background: "var(--tg-secondary)", color: "var(--tg-fg-2)" }}>{up.log.join("\n")}</pre>
+              )}
             </>
           ) : (
-            <span className="text-[13.5px]" style={hint}>To update when there's a new version, run this on your server. It backs up first and rolls back by itself if something goes wrong:</span>
+            <>
+              <span className="text-[13.5px] leading-snug" style={hint}>To update, run this on your server. It backs up first and rolls back by itself if something goes wrong:</span>
+              <button type="button" onClick={() => void copy()} className="flex items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left font-mono text-[13px]" style={{ background: "var(--tg-secondary)" }}>
+                {cmd}<Copy size={14} aria-label="Copy" />
+              </button>
+              {s.docker && (
+                <span className="text-[13px] leading-snug" style={hint}>
+                  Want an <b>Update now</b> button here instead? Add <code>updater</code> to <code>COMPOSE_PROFILES</code> in <code>.env</code>, then run <code>docker compose up -d</code> once.
+                </span>
+              )}
+            </>
           )}
-          <button type="button" onClick={() => void copy()} className="flex items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left font-mono text-[13px]" style={{ background: "var(--tg-secondary)" }}>
-            {cmd}<Copy size={14} aria-label="Copy" />
-          </button>
         </div>
         <div className="flex flex-col gap-1.5 px-4 py-3.5 text-[14.5px]">
           <span className="flex items-center gap-2">{dot(s.telegram.status === "running")}Telegram bot: {s.telegram.status === "running" ? "connected" : s.telegram.status === "disabled" ? "not set up (TELEGRAM_BOT_TOKEN in .env)" : s.telegram.status}</span>
@@ -303,6 +368,16 @@ function SystemSection() {
           <Button onClick={async () => { const b = await api.backupNow(); await qc.invalidateQueries({ queryKey: ["system"] }); toast.show({ text: `Backed up (${Math.round(b.bytes / 1024)} KB)` }); }}>Back up now</Button>
         </div>
       </Card>
+      {confirmUpdate && (
+        <Confirm
+          title="Update now?"
+          tone="accent"
+          confirm="Update"
+          onConfirm={() => void ask("update")}
+          onClose={() => setConfirmUpdate(false)}
+          text="Your data is backed up first. The app restarts during the update (usually 1 to 5 minutes) and reminders pause meanwhile. If the new version doesn't start, the old one comes back by itself."
+        />
+      )}
     </section>
   );
 }

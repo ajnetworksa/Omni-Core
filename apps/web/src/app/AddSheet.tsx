@@ -80,11 +80,19 @@ export function AddSheet({ onClose, project }: { onClose: () => void; project?: 
     setError("");
     tg?.MainButton.showProgress();
     try {
-      const t = await api.createIn(text.trim(), project?.slug);
+      const { tasks } = await api.createMany(text.trim(), project?.slug);
       haptic.ok();
       await refreshAll();
       onClose();
-      toast.show({ text: `Added: ${t.title}`, undo: async () => { const r = await api.deleteTask(t.id); return r; } });
+      const first = tasks[0]!;
+      toast.show({
+        text: tasks.length > 1 ? `Added ${tasks.length} tasks` : `Added: ${first.title}`,
+        undo: async () => {
+          let r = await api.deleteTask(first.id);
+          for (const t of tasks.slice(1)) r = await api.deleteTask(t.id);
+          return r;
+        },
+      });
     } catch {
       haptic.err();
       setError("Couldn't save it. Check the connection and try again.");
@@ -93,7 +101,9 @@ export function AddSheet({ onClose, project }: { onClose: () => void; project?: 
     }
   }, [text, tg, onClose, project, toast]);
 
-  usePrimary({ label: project ? `Add to ${project.title}` : "Add task", onClick: () => void submit(), enabled: !!text.trim() }, [text, submit]);
+  const many = parsed?.items && parsed.items.length > 1 ? parsed.items : null;
+  const addLabel = many ? `Add ${many.length} tasks${project ? ` to ${project.title}` : ""}` : project ? `Add to ${project.title}` : "Add task";
+  usePrimary({ label: addLabel, onClick: () => void submit(), enabled: !!text.trim() }, [text, submit, addLabel]);
   useBack(onClose);
 
   const chips = parsed
@@ -116,10 +126,10 @@ export function AddSheet({ onClose, project }: { onClose: () => void; project?: 
           ref={ref}
           rows={2}
           value={text}
-          onChange={(e) => { setText(e.target.value.replace(/\n/g, " ")); setCaret(e.target.selectionStart ?? e.target.value.length); }}
+          onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart ?? e.target.value.length); }}
           onSelect={(e) => setCaret((e.target as HTMLTextAreaElement).selectionStart ?? 0)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); if (suggestions[0] && word) { const s = suggestions[0]; if (s.pickDate) dateRef.current?.showPicker?.(); else replaceWord(s.insert); } else void submit(); }
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (suggestions[0] && word) { const s = suggestions[0]; if (s.pickDate) dateRef.current?.showPicker?.(); else replaceWord(s.insert); } else void submit(); }
           }}
           placeholder="What needs doing?"
           className="resize-none rounded-[14px] px-3.5 py-3 text-[16.5px] leading-snug outline-none"
@@ -166,8 +176,18 @@ export function AddSheet({ onClose, project }: { onClose: () => void; project?: 
           onChange={(e) => e.target.value && replaceWord(`📅 ${e.target.value}`)}
         />
 
+        {many && (
+          <div className="flex flex-col gap-1 rounded-[12px] px-3.5 py-2.5" style={{ background: "var(--tg-accent-soft)" }} aria-label="Tasks to add">
+            <span className="text-[13px] font-semibold" style={{ color: "var(--tg-link)" }}>{`Adds ${many.length} separate tasks:`}</span>
+            <ol className="m-0 flex list-decimal flex-col gap-0.5 pl-5 text-[14px]">
+              {many.map((t, i) => <li key={i} className="truncate">{t || <i style={{ color: "var(--tg-hint)" }}>(empty)</i>}</li>)}
+            </ol>
+          </div>
+        )}
         <div className="flex min-h-[26px] flex-wrap items-center gap-1.5">
-          {chips.length > 0 ? (
+          {many ? (
+            <span className="text-[12.5px]" style={{ color: "var(--tg-hint)" }}>Each task keeps its own @date, !priority and #tags.</span>
+          ) : chips.length > 0 ? (
             <>
               <span className="text-[12.5px]" style={{ color: "var(--tg-hint)" }}>Saved as</span>
               {parsed?.title && <span className="max-w-[60%] truncate text-[13px] font-semibold">{parsed.title}</span>}
@@ -177,14 +197,14 @@ export function AddSheet({ onClose, project }: { onClose: () => void; project?: 
             </>
           ) : (
             <span className="text-[12.5px]" style={{ color: "var(--tg-hint)" }}>
-              Just type what needs doing. To add a date, priority or project, tap a chip above (or type <b>@</b>, <b>!</b> or <b>#</b>).
+              Just type what needs doing. To add a date, priority or project, tap a chip above (or type <b>@</b>, <b>!</b> or <b>#</b>). Several at once: <b>1. … 2. …</b> or one per line (Shift+Enter).
             </span>
           )}
         </div>
         {error && <p className="m-0 text-[13px]" style={{ color: "var(--tg-danger)" }}>{error}</p>}
         {!tg && (
           <button type="button" disabled={!text.trim()} onClick={() => void submit()} className="h-[52px] rounded-[14px] text-[16px] font-semibold disabled:opacity-50" style={{ background: "var(--tg-accent)", color: "var(--tg-accent-fg)" }}>
-            {project ? `Add to ${project.title}` : "Add task"}
+            {addLabel}
           </button>
         )}
     </Sheet>

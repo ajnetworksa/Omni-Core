@@ -7,6 +7,7 @@ import {
   appendAnchor,
   charFromStatus,
   parseQuickAdd,
+  splitTaskList,
   parseTaskText,
   removeAnchor,
   removeDoneToken,
@@ -262,6 +263,15 @@ export class TaskService {
       this.db.update(tasks).set({ status: input.status }).where(eq(tasks.id, created.id)).run();
     }
     return this.get(created.id);
+  }
+
+  /** Like create(), but a typed or pasted list ("1. a 2. b", one item per line) becomes one task per item. */
+  async createMany(input: CreateTaskInput): Promise<Task[]> {
+    const items = splitTaskList(input.text);
+    if (!items.length) throw new Error("Task title is empty");
+    const out: Task[] = [];
+    for (const text of items) out.push(await this.create({ ...input, text }));
+    return out;
   }
 
   /** Journal-style capture (Telejournal / Telegram Vault Bot idea): `- HH:mm text` under ## Log. */

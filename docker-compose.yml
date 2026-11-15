@@ -8,8 +8,9 @@
 #   tunnel       Cloudflare Tunnel on your own domain — needs CLOUDFLARE_TUNNEL_TOKEN
 #   quicktunnel  instant https://….trycloudflare.com address, no account or domain (the bot sends you the link)
 #   redis        Redis + BullMQ scheduler instead of the built-in timers (optional)
+#   updater      the Update button in Settings (a small helper that runs scripts/update.sh for you)
 #
-# Update:  scripts/update.sh   (or simply: git pull && docker compose up -d --build)
+# Update:  Settings → Update (with the updater profile), or scripts/update.sh, or: git pull && docker compose up -d --build
 
 services:
   omnicore-app:
@@ -91,3 +92,20 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - ./redis-data:/data
+
+  # Settings → "Update now". Idle until you tap it; then it runs scripts/update.sh (backup first,
+  # health check, automatic rollback) on this checkout, as the folder's owner. It needs the Docker
+  # socket to rebuild/restart the app, which gives it control of Docker on this machine. Your home
+  # folder is mounted read-only only so git can use your SSH key / credentials for the private repo.
+  omnicore-updater:
+    build: docker/updater
+    image: omnicore-updater:local
+    container_name: omnicore_updater
+    restart: unless-stopped
+    profiles: ["updater"]
+    environment:
+      OMNICORE_URL: http://omnicore-app:3000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/repo
+      - ${UPDATER_HOME:-${HOME:-/root}}:/host-home:ro

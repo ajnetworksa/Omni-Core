@@ -9,7 +9,7 @@ is deployed; your job is to change only what was asked, and prove nothing else b
 
 1. **Never claim something works without running it.** "Should work", "this will fix it", "tests
    pass" are only allowed after you ran the command and saw the output. Quote the numbers
-   (e.g. `E2E 56/56`, `VERIFY: PASS`). If a step failed or was skipped, say so first.
+   (e.g. `E2E 58/58`, `VERIFY: PASS`). If a step failed or was skipped, say so first.
 2. **Verify before and after.** Run `npm run verify:quick` before you start (so you know the
    baseline) and `npm run verify` when you're done. If the baseline already fails, stop and report
    it instead of building on top of it.

@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, like, lte, or, sql } from "drizzle
 import type { DB } from "../db/client.js";
 import { noteLinks, notes, projects, remindersLog, tasks, type Remark, type Task, type TaskStatus } from "../db/schema.js";
 import { evaluateNag, intervalFor, nagStateOf, type NagConfig, type NagState } from "../nag/engine.js";
-import { parseQuickAdd } from "../markdown/tasks.js";
+import { parseQuickAdd, splitTaskList } from "../markdown/tasks.js";
 import { addDays, todayInTz, zonedToInstant } from "../util/time.js";
 
 /**
@@ -292,7 +292,8 @@ export function search(db: DB, q: string, cfg: NagConfig, now = new Date()) {
 
 /** Quick-add preview: what the parser understood (shown as chips while typing). */
 export function parsePreview(text: string, timeZone: string, now = new Date()) {
-  const m = parseQuickAdd(text, timeZone, now);
+  const list = splitTaskList(text);
+  const m = parseQuickAdd(list.length > 1 ? list[0]! : text, timeZone, now);
   const projectTag = m.tags.find((t) => t.startsWith("project/"));
   return {
     title: m.title,
@@ -302,5 +303,7 @@ export function parsePreview(text: string, timeZone: string, now = new Date()) {
     recurrence: m.recurrence ?? null,
     project: projectTag ? projectTag.slice("project/".length) : null,
     tags: m.tags.filter((t) => !t.startsWith("project/")),
+    /** Set when the text is a list: the title of each task that will be added. */
+    items: list.length > 1 ? list.map((t) => parseQuickAdd(t, timeZone, now).title) : null,
   };
 }

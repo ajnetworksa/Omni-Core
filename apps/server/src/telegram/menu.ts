@@ -3,9 +3,11 @@ import {
   applyTaskAction,
   listTasks,
   parseQuickAdd,
+  splitTaskList,
   projects,
   todayInTz,
   todayView,
+  type Task,
   type TaskPatch,
 } from "@omnicore/core";
 import { asc, eq } from "drizzle-orm";
@@ -13,7 +15,7 @@ import { GrammyError, InlineKeyboard, Keyboard, type Bot, type Context } from "g
 import { randomBytes } from "node:crypto";
 import { aiFeatures } from "../ai.js";
 import type { AppContext } from "../context.js";
-import { esc, formatProject, formatTaskCreated, formatToday, getMiniAppUrl, HELP, reminderKeyboard, shortDate } from "./format.js";
+import { esc, formatProject, formatTaskCreated, formatTasksCreated, formatToday, getMiniAppUrl, HELP, reminderKeyboard, shortDate } from "./format.js";
 
 /**
  * The button-driven side of the bot: a persistent keyboard, a menu, a step-by-step "new task"
@@ -36,6 +38,8 @@ export interface MenuDeps {
 
 interface Draft {
   raw: string;
+  /** Set when the text was a list: one task per item; date, time, priority and project apply to all. */
+  items?: string[];
   title: string;
   date?: string;
   time?: string;
@@ -145,8 +149,9 @@ export function installMenus(bot: Bot, app: AppContext, deps: MenuDeps) {
   // ---------- new task card ----------
   const draftCard = (id: string, d: Draft, mode: "main" | "time" | "project" = "main") => {
     const lines = [
-      "📝 <b>New task</b>",
-      `<b>${esc(d.title)}</b>`,
+      ...(d.items
+        ? [`📝 <b>${d.items.length} new tasks</b>`, ...d.items.map((t, i) => `${i + 1}. ${esc(parseQuickAdd(t, tz).title)}`)]
+        : ["📝 <b>New task</b>", `<b>${esc(d.title)}</b>`]),
       "",
       `📅 ${dayLabel(d.date)}${d.time ? ` · ⏰ ${d.time}` : ""}`,
       `🚩 ${PRIO[d.priority] ?? PRIO[4]}`,
@@ -184,15 +189,18 @@ export function installMenus(bot: Bot, app: AppContext, deps: MenuDeps) {
   };
 
   const startDraft = async (ctx: Context, raw: string, projectId?: string) => {
-    const meta = parseQuickAdd(raw, tz);
+    const items = splitTaskList(raw);
+    const meta = parseQuickAdd(items.length > 1 ? items[0]! : raw, tz);
     if (!meta.title) return ctx.reply("That task has no title. Try again with ➕ New task.");
     const proj = projectId ? db.select().from(projects).where(eq(projects.id, projectId)).get() : undefined;
+    const many = items.length > 1;
     const d: Draft = {
       raw,
-      title: meta.title,
-      date: meta.dueDate ?? todayInTz(tz),
-      time: meta.dueTime,
-      priority: meta.priority ?? 4,
+      ...(many ? { items } : {}),
+      title: many ? `${items.length} tasks` : meta.title,
+      date: many ? todayInTz(tz) : meta.dueDate ?? todayInTz(tz),
+      time: many ? undefined : meta.dueTime,
+      priority: many ? 4 : meta.priority ?? 4,
       projectId: proj?.id,
       projectTitle: proj?.title,
     };
@@ -205,9 +213,27 @@ export function installMenus(bot: Bot, app: AppContext, deps: MenuDeps) {
   };
 
   const saveTask = async (ctx: Context, id: string, d: Draft) => {
-    const meta = parseQuickAdd(d.raw, tz);
     const proj = d.projectId ? db.select().from(projects).where(eq(projects.id, d.projectId)).get() : undefined;
     const projectNote = proj && (await app.vault.exists(`projects/${proj.slug}.md`)) ? `projects/${proj.slug}.md` : undefined;
+    if (d.items) {
+      // A list: the card's choices fill in what each item didn't say itself.
+      const made: Task[] = [];
+      for (const raw of d.items) {
+        const meta = parseQuickAdd(raw, tz);
+        const typed = meta.tags.some((t) => t.startsWith("project/"));
+        let t = await app.tasks.create({ text: raw, notePath: typed ? undefined : projectNote, projectSlug: proj && !projectNote && !typed ? proj.slug : undefined });
+        const patch: TaskPatch = {};
+        if (!meta.priority && d.priority !== 4) patch.priority = d.priority;
+        if (!meta.dueDate && d.date) patch.dueDate = d.date;
+        if (!meta.dueTime && d.time) patch.dueTime = d.time;
+        if (Object.keys(patch).length) t = await app.tasks.update(t.id, patch);
+        made.push(t);
+      }
+      dropDraft(id);
+      const { text, keyboard } = formatTasksCreated(made);
+      return void (await show(ctx, `${text}${proj ? `\n📁 ${esc(proj.title)}` : ""}`, keyboard));
+    }
+    const meta = parseQuickAdd(d.raw, tz);
     const typedProject = meta.tags.some((t) => t.startsWith("project/"));
     let t = await app.tasks.create({ text: d.raw, notePath: projectNote, projectSlug: proj && !projectNote && !typedProject ? proj.slug : undefined });
     const patch: TaskPatch = {};

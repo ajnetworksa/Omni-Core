@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import type { VersionInfo, AiStatus, AskResult, AskSource, GraphData, NoteDetail, NoteListItem, Parsed, Prefs, Project, ProjectDetail, SettingsPage, SystemInfo, TaskAction, TaskCard, TaskDetail, TodayBoard } from "./types";
+import type { VersionInfo, AiStatus, AskResult, AskSource, GraphData, NoteDetail, NoteListItem, Parsed, Prefs, Project, ProjectDetail, SettingsPage, SystemInfo, TaskAction, UpdaterStatus, TaskCard, TaskDetail, TodayBoard } from "./types";
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly body: unknown) {
@@ -44,6 +44,7 @@ export const api = {
   restart: () => req<{ restarting: boolean }>("POST", "/settings/restart"),
   pause: (minutes: number) => req<{ pausedUntil: string | null }>("POST", "/reminders/pause", { minutes }),
   system: () => req<SystemInfo>("GET", "/system"),
+  requestUpdate: (kind: "check" | "update") => req<UpdaterStatus>("POST", "/system/update", { kind }),
   backupNow: () => req<{ name: string; bytes: number }>("POST", "/backup"),
   deleteTask: (id: string) => req<{ title: string; removed: number; undo: string | null }>("DELETE", `/tasks/${encodeURIComponent(id)}`),
   deleteProject: (slug: string, keepTasks: boolean) => req<{ title: string; tasksDeleted: number; tasksKept: number }>("DELETE", `/projects/${encodeURIComponent(slug)}?keepTasks=${keepTasks}`),
@@ -52,6 +53,7 @@ export const api = {
   project: (slug: string) => req<ProjectDetail>("GET", `/projects/${encodeURIComponent(slug)}`),
   createProject: (name: string) => req<Project & { path: string; created: boolean }>("POST", "/projects", { name }),
   suggest: () => req<{ projects: { slug: string; title: string }[]; tags: string[] }>("GET", "/suggest"),
+  createMany: (text: string, projectSlug?: string) => req<{ tasks: TaskCard[] }>("POST", "/tasks/many", projectSlug ? { text, projectSlug } : { text }),
   createIn: (text: string, projectSlug?: string) => req<TaskCard>("POST", "/tasks", projectSlug ? { text, projectSlug } : { text }),
   notes: () => req<NoteListItem[]>("GET", "/notes"),
   note: (id: string) => req<NoteDetail>("GET", `/notes/${encodeURIComponent(id)}`),

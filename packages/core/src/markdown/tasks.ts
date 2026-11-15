@@ -138,6 +138,53 @@ export function parseQuickAdd(input: string, timeZone: string, now = new Date())
   return meta;
 }
 
+/**
+ * A list typed or pasted into the task box becomes one task per item:
+ *   "1. Buy milk 2. Call ISP @tomorrow"      → ["Buy milk", "Call ISP @tomorrow"]
+ *   "1 buy milk 2 call ISP"                  → ["buy milk", "call ISP"]   (numbers must run 1, 2, 3…)
+ *   "Groceries:\n- milk\n- eggs"              → ["milk", "eggs"]           (a "…:" header line is dropped)
+ *   any text on several lines               → one task per line
+ * Anything else comes back as a single item, unchanged. Each item keeps its own @date / !p / #tags.
+ */
+export function splitTaskList(input: string, max = MAX_LIST_ITEMS): string[] {
+  const text = input.trim();
+  if (!text) return [];
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let items: string[] | null = null;
+  if (lines.length >= 2) {
+    const body = /:$/.test(lines[0]!) && !LIST_MARK.test(lines[0]!) ? lines.slice(1) : lines;
+    // Bare "1 milk / 2 eggs" numbering only counts when every line carries the next number.
+    const bare = body.length >= 2 && body.every((l, i) => new RegExp(`^${i + 1}\\s+\\S`).test(l));
+    items = body.map((l) => (bare ? l.replace(/^\d+\s+/, "") : l.replace(LIST_MARK, "")).trim());
+  } else {
+    items = splitInlineNumbers(text);
+  }
+  const out = (items ?? [text]).filter(Boolean);
+  return out.length ? out.slice(0, max) : [text];
+}
+export const MAX_LIST_ITEMS = 30;
+/** "1." "2)" "3-" "- " "* " "• " "[ ] " "- [ ] " at the start of a line. */
+const LIST_MARK = /^(?:\d{1,3}[.)-]\s+|-\s+\[[ xX]?\]\s+|\[[ xX]?\]\s+|[-*•–]\s+)/;
+
+/** "1. a 2. b 3. c" / "1) a 2) b" / "1 a 2 b" on one line. Needs at least two items, numbered in order. */
+function splitInlineNumbers(text: string): string[] | null {
+  // "1." / "1)" may be followed directly by the text ("1.milk"), but not by a digit ("1.5 kg").
+  const start = text.match(/^1([.)-])\s*(?=[^\s\d])/) ?? text.match(/^1()\s+(?=\S)/);
+  if (!start) return null;
+  const sep = start[1] ? `\\${start[1]}\\s*(?=[^\\s\\d])` : "\\s+(?=\\S)";
+  const items: string[] = [];
+  let rest = text.slice(start[0].length);
+  for (let n = 2; n <= MAX_LIST_ITEMS + 1; n++) {
+    const next = new RegExp(`\\s${n}${sep}`).exec(rest);
+    if (!next) break;
+    items.push(rest.slice(0, next.index).trim());
+    rest = rest.slice(next.index + next[0].length);
+  }
+  if (!items.length) return null;
+  items.push(rest.trim());
+  return items;
+}
+
 /** One-line, control-character-free text: anything multi-line would become extra markdown lines. */
 export function singleLine(text: string): string {
   return text.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim();

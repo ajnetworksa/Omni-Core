@@ -48,6 +48,7 @@ import { getMiniAppUrl } from "../telegram/format.js";
 import { AuthThrottle, tokenMatches } from "../security.js";
 import { aiFeatures, embedHealth, runDigest, runEmbedSync } from "../ai.js";
 import { updateInfo } from "../version.js";
+import { requestUpdate, UpdateBusyError, UpdaterMissingError, updaterStatus, updateDir } from "../updater.js";
 
 const Status = z.enum(TASK_STATUSES);
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -110,6 +111,8 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext, opts: { t
     if (err instanceof NoteConflictError) return reply.status(409).send({ error: "note_conflict", checksum: err.currentChecksum });
     if (err instanceof VaultPathError) return reply.status(400).send({ error: "invalid_path", message: err.message });
     if (err instanceof UndoExpiredError) return reply.status(410).send({ error: "undo_expired", message: err.message });
+    if (err instanceof UpdaterMissingError) return reply.status(409).send({ error: "updater_missing", message: err.message });
+    if (err instanceof UpdateBusyError) return reply.status(409).send({ error: "update_busy", message: err.message });
     if (err instanceof AiUnavailableError) {
       return reply.status(err.reason === "busy" ? 429 : 503).send({ error: "ai_unavailable", reason: err.reason, message: err.message });
     }
@@ -213,6 +216,7 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext, opts: { t
     api.get<{ Params: { id: string } }>("/tasks/:id", async (req) => ctx.tasks.get(req.params.id));
     api.get<{ Params: { id: string } }>("/tasks/:id/detail", async (req, reply) => taskDetail(db, req.params.id, nag()) ?? reply.status(404).send({ error: "not_found" }));
     api.post("/tasks", async (req, reply) => reply.status(201).send(await ctx.tasks.create(CreateTask.parse(req.body))));
+    api.post("/tasks/many", async (req, reply) => reply.status(201).send({ tasks: await ctx.tasks.createMany(CreateTask.parse(req.body)) }));
     api.patch<{ Params: { id: string } }>("/tasks/:id", async (req) => ctx.tasks.update(req.params.id, PatchTask.parse(req.body)));
     api.post<{ Params: { id: string; action: string } }>("/tasks/:id/actions/:action", async (req) => {
       const action = z.enum(TASK_ACTIONS).parse(req.params.action);
@@ -324,8 +328,10 @@ export async function apiRoutes(app: FastifyInstance, ctx: AppContext, opts: { t
       },
       backups: listBackups(config.DATABASE_PATH).slice(0, 5),
       docker: process.env.OMNICORE_DOCKER === "1",
+      updater: updaterStatus(updateDir(config.DATABASE_PATH)),
     }));
     api.post("/backup", async () => backupNow(config.DATABASE_PATH));
+    api.post("/system/update", async (req) => requestUpdate(updateDir(config.DATABASE_PATH), z.object({ kind: z.enum(["check", "update"]) }).parse(req.body).kind));
 
     // --- AI
     const deps = () => ({ db, ai: ctx.ai, semantic: ctx.semantic, nag: ctx.nag });

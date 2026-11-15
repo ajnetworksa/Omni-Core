@@ -57,6 +57,8 @@ apps/web/               React 19 + Vite + Tailwind 4: ONE app, served at / (web)
   src/settings.ts (server) settings registry: labels/help shown in the UI; stored in the `settings` table
 tests/                  end-to-end suites (real server + mock Telegram/AI); lib/ has the mocks
 scripts/                verify.mjs (the proof), update.sh, install.sh (optional), config-docs.mjs, setup-hooks.mjs
+docker/updater/         optional helper for Settings → Update (profile `updater`): runs scripts/update.sh on request;
+                        talks to the app through data/.update/ (apps/server/src/updater.ts reads/writes it)
 .githooks/              pre-push → verify:quick (installed by `npm ci`)
 .agents/                rules/ (always-on rules) and workflows/ (/verify /feature /fix /release /deploy /handoff)
 demo/                   screenshot/demo scripts (Playwright); not part of the product
